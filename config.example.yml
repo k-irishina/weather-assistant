@@ -1,0 +1,13 @@
+database:
+  name: 'name'
+  user: 'user'
+  password: 'password'
+  host: 'host'
+  port: 5432
+telegram:
+  token: bot-token
+met-api:
+  user-agent-header: 'AppName Contact e-mail'
+users:
+  test-users: [111111, 22222]
+  admin-users: [111111, 22222]
