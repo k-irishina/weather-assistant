@@ -13,6 +13,7 @@ Message @WhisperWeatherBot on Telegram and use /help to get available commands a
 * More accurate sun predictions
 * Automatic short forecast sent at user-defined time
 * A more detailed forecast upon user request
+* Recommendations based on past weather and the forecast
 * Better-looking output
 * Standalone app for UI and notifications
 

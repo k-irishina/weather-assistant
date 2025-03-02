@@ -4,3 +4,4 @@ fetch_forecast.py
 test.py
 __pycache__/
 data/
+startup.sh

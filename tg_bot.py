@@ -124,15 +124,15 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""
     await update.message.reply_text(update.message.text)
 
-def schedule_forecast_update(app: Application) -> None:
+def schedule_sun_update(app: Application) -> None:
     #job_time = datetime.now(UTC) + timedelta(minutes=1)
     local_timezone = pytz.timezone('Europe/Oslo')
-    target_time = time(12, 00, tzinfo=local_timezone)
+    target_time = time(12, 15, tzinfo=local_timezone)
 
     app.job_queue.run_daily(
-        send_update, target_time, name='kristina-daily-sun', data=datetime.now() + timedelta(minutes=1))
+        send_sun_update, target_time, name='kristina-daily-sun', data=datetime.now() + timedelta(minutes=1))
 
-async def send_update(context: ContextTypes.DEFAULT_TYPE):
+async def send_sun_update(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Running sun forecast analysis...")
     # todo: check users for subscription, get their location, send
     for user_id in db.dynamic_update_users():
@@ -140,11 +140,16 @@ async def send_update(context: ContextTypes.DEFAULT_TYPE):
             sun_change_text = assistant.detect_sun_change(user_id)
             await context.bot.send_message(user_id, text=sun_change_text)
 
+def schedule_morning_forecast(app: Application) -> None:
+    target_time = time(7, 15, tzinfo=pytz.timezone('Europe/Oslo'))
+
+    app.job_queue.run_daily(
+        receive_forecast, target_time, name='kristina-morning-forecast', data=datetime.now() + timedelta(minutes=1))
+
 def main() -> None:
-    """Start the bot."""
+    """Starting weather assistant..."""
 
     token = config['telegram']['token']
-    # Create the Application and pass it your bot's token.
     application = Application.builder().token(token).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -164,15 +169,9 @@ def main() -> None:
     )
     application.add_handler(set_location_handler)
 
-    # on non command i.e message - echo the message on Telegram
-   # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-
-    # Explicitly initialize JobQueue and attach it to Application
-    #job_queue = JobQueue()
-    #job_queue.set_application(application)
-    #application.job_queue = job_queue  # Attach job_queue to the application
     # Run the bot until the user presses Ctrl-C
-    schedule_forecast_update(application)
+    schedule_sun_update(application)
+    schedule_morning_forecast(application)
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
