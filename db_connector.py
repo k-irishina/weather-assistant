@@ -1,40 +1,34 @@
 import psycopg
+import psycopg_pool
 import area
 import yaml
 import analysis_constants
 from datetime import date
 from datetime import time
+from datetime import datetime
 
 config = yaml.safe_load(open("config.yml"))
 database_config = config["database"]
-
-def connect_to_db() -> psycopg.Connection:
-    strconn="""
+pool_config = config["database"]["pool"]
+strconn = """
         dbname=%s 
         user=%s 
         host=%s 
         password=%s 
         port=%s 
-        """ % (database_config["name"], database_config["user"], database_config["host"], database_config["password"]
-              ,database_config["port"])
-    return psycopg.connect(conninfo=strconn)
+        """ % (
+    database_config["name"],
+    database_config["user"],
+    database_config["host"],
+    database_config["password"],
+    database_config["port"],
+)
+
+connpool = psycopg_pool.ConnectionPool(conninfo=strconn, timeout=pool_config["timeout"], max_size=pool_config["max_size"])
 
 # todo: this should REALLY not be a one-for-one insertion
-def insert_into_table(conn, created_at, forecast_time, area: area.Area, data):
-    cur = conn.cursor()
-    cur.execute(
-        """
-                INSERT INTO forecast_complete(forecast_created_at, forecast_time, area, forecast_data)
-                VALUES(%s, %s, %s, %s) 
-                """,
-        (created_at, forecast_time, area.db_int, data),
-    )
-    conn.commit()
-    cur.close()
-
-# todo: this should REALLY not be a one-for-one insertion
-def insert_into_table_p3(created_at, forecast_time, area: area.Area, data):
-    with connect_to_db() as conn:
+def insert_into_table(created_at, forecast_time, area: area.Area, data):
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -47,7 +41,7 @@ def insert_into_table_p3(created_at, forecast_time, area: area.Area, data):
 
 
 def select_all_from():
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -56,6 +50,7 @@ def select_all_from():
             )
             result = cur.fetchall()
             print(result)
+
 
 def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offset=0):
 
@@ -71,7 +66,7 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
                 AND forecast_time BETWEEN NOW() AND NOW() + INTERVAL '%s hours'
             """
 
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(query, (hour_offset, area.db_int, next_hours))
             records = cursor.fetchall()
@@ -120,7 +115,7 @@ def select_related_temperatures(area: area.Area, date):
         GROUP BY time_period;
     """
 
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(query, (date, date, area.db_int))
             results = cursor.fetchall()
@@ -141,11 +136,11 @@ def evaluate_clouds(
     sunrise: time = time(8, 0),
     sunset: time = time(16, 0),
 ):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cursor:
-    # todo - sunrise/sunset times should be dynamic!
-    # fetch from
-    # https://docs.api.met.no/doc/sunrise/celestial.html
+            # todo - sunrise/sunset times should be dynamic!
+            # fetch from
+            # https://docs.api.met.no/doc/sunrise/celestial.html
             query = """
                     WITH latest_data AS (
                         SELECT forecast_time, forecast_data->>'cloud_area_fraction' AS clouds_total,
@@ -166,7 +161,7 @@ def evaluate_clouds(
                     WHERE clouds_total::numeric < %s OR (clouds_low::numeric * 0.7 + clouds_medium::numeric * 0.3 < 35.0 AND clouds_total::numeric < 80.0)
                     ORDER BY forecast_time;
                 """
-                    # Execute the query with the specified parameters
+            # Execute the query with the specified parameters
             cursor.execute(
                 query,
                 (
@@ -186,7 +181,7 @@ def evaluate_clouds(
 
 
 def evaluate_rain(area: area.Area, date: date):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
                     WITH latest_data AS (
@@ -210,18 +205,18 @@ def evaluate_rain(area: area.Area, date: date):
                     # Execute the query with the specified parameters
                     cursor.execute(query, (date, date, area.db_int, 40.0))
                     results = cursor.fetchall()
-        
+
                     # Convert results to a set of tuples for unique entries
                     precip_results = {row[0]: row[1] for row in results}
-        
+
             finally:
                 cursor.close()
-        
+
             return precip_results
 
 
 def evaluate_wind(conn, area: area.Area, date: date):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cursor:
             # wind_speed is m/s
             query = """
@@ -242,8 +237,9 @@ def evaluate_wind(conn, area: area.Area, date: date):
                 ORDER BY forecast_time;
             """
 
+
 def highest_uv_index(area: area.Area, date: date):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
                     SELECT MAX((forecast_data->>'ultraviolet_index_clear_sky')::numeric) AS uv_index
@@ -255,22 +251,25 @@ def highest_uv_index(area: area.Area, date: date):
                           WHERE forecast_time::date = %s AND area = %s
                           GROUP BY forecast_time
                       )
-            """
+                """
             cursor.execute(query, (date, date, area.db_int))
             results = cursor.fetchone()
             uv_result = results[0]
             return uv_result
 
+
 def update_user_location(user_id, area: area.Area):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"INSERT INTO app_profiles(user_id, area) VALUES(%s,%s) ON CONFLICT (user_id) DO UPDATE SET area = EXCLUDED.area;", (user_id, area.db_int)
+                f"INSERT INTO app_profiles(user_id, area) VALUES(%s,%s) ON CONFLICT (user_id) DO UPDATE SET area = EXCLUDED.area;",
+                (user_id, area.db_int),
             )
             conn.commit()
 
+
 def fetch_user_location(user_id) -> int:
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(f"SELECT area FROM app_profiles WHERE user_id = %s", (user_id,))
             result = cur.fetchone()
@@ -281,62 +280,70 @@ def fetch_user_location(user_id) -> int:
             for area_ in area.cities.values():
                 if area_.db_int == result[0]:
                     return result[0]
-        
+
             return 0
 
 
 def log_forecast(created_at, modified, area: area.Area):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                        INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified, area) 
-                        VALUES (%s, %s, %s)
-                        """,
+                INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified, area) 
+                VALUES (%s, %s, %s)
+                """,
                 (created_at, modified, area.db_int),
             )
             conn.commit()
 
+
 def last_fetch(area: area.Area):
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 f"""
-                        SELECT forecast_last_modified from forecast_update_log
-                        WHERE area = %s
-                        ORDER BY id DESC
-                        LIMIT 1
-                        """, (area.db_int,)
+                SELECT forecast_last_modified from forecast_update_log
+                WHERE area = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (area.db_int,),
             )
             result = cur.fetchone()
             if result is None:
-                return 0
+                return datetime.min
             return result[0]
 
+
 def toggle_updates(user_id) -> bool:
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 f"""
-                        SELECT dynamic_sun_updates from app_profiles
-                        WHERE user_id = %s
-                        """, (user_id,)
+                SELECT dynamic_sun_updates from app_profiles
+                WHERE user_id = %s
+                """,
+                (user_id,),
             )
             enabled = cur.fetchone()[0]
             cur.execute(
                 """
-                        UPDATE app_profiles
-                        SET dynamic_sun_updates = %b
-                        WHERE user_id = %s
-                        """, (not enabled, user_id)
+                UPDATE app_profiles
+                SET dynamic_sun_updates = %b
+                WHERE user_id = %s
+                """,
+                (not enabled, user_id),
             )
             conn.commit()
             return not enabled
 
+
 def dynamic_update_users() -> list:
-    with connect_to_db() as conn:
+    with connpool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT user_id FROM app_profiles WHERE dynamic_sun_updates = TRUE""")
+            cur.execute(
+                """SELECT user_id FROM app_profiles WHERE dynamic_sun_updates = TRUE"""
+            )
             result = cur.fetchall()
             result_list = []
             for res in result:

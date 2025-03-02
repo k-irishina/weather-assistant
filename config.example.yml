@@ -4,6 +4,10 @@ database:
   password: 'password'
   host: 'host'
   port: 5432
+  pool:
+    # seconds
+    timeout: 30
+    max_size: 10
 telegram:
   token: bot-token
 met-api:

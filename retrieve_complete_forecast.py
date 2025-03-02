@@ -6,7 +6,7 @@ import yr_requests
 import sys
 from datetime import datetime
 
-def fetch_forecast_for_area_id(area_id, conn=db.connect_to_db()):
+def fetch_forecast_for_area_id(area_id):
     user_area = area.cities2.get(area_id, area.cities2[1])
 
     last_fetched = db.last_fetch(user_area)
@@ -46,7 +46,7 @@ def fetch_forecast_for_area_id(area_id, conn=db.connect_to_db()):
     db.log_forecast(forecast_created_at, str(last_modified_header), user_area)
     
     for time in db_data:
-        db.insert_into_table(conn, forecast_created_at, time.get('forecast_time'), user_area, json.dumps(time, indent=4))
+        db.insert_into_table(forecast_created_at, time.get('forecast_time'), user_area, json.dumps(time, indent=4))
 
 def fetch_forecast_for_user(user_id):
     area_id = db.fetch_user_location(user_id)

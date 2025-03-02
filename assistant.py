@@ -80,15 +80,13 @@ def get_greeting():
             return random.choice(phrases)
 
 def detect_sun_change(user_id):
-
-    conn = db_connector.connect_to_db()
     int_location = db_connector.fetch_user_location(user_id)
     select_area = area.cities2[int_location]
     # get previous forecast (time fetched < 9AM of the day)
     timedelta = datetime.now().hour - time(hour=10, minute=0).hour
 
     if timedelta < 0: 
-        print("No changes to analyse yet, timedelta:" + timedelta)
+        print("No changes to analyse yet, timedelta:" + str(timedelta))
         return
     previous_forecast = db_connector.select_previous_forecast_for_x_hrs(select_area, 12, timedelta)
     latest_forecast = db_connector.select_previous_forecast_for_x_hrs(select_area, 12, 0)
