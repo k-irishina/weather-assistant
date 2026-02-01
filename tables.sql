@@ -13,7 +13,16 @@ CREATE TABLE app_profiles(
              dynamic_sun_updates boolean);
 
 CREATE TABLE forecast_update_log(
-            id SERIAL PRIMARY KEY,
-            forecast_created_at timestamp,
-            forecast_last_modified timestamp,
-            area integer)
+             id SERIAL PRIMARY KEY,
+             forecast_created_at timestamp,
+             forecast_last_modified timestamp,
+             area integer)
+
+CREATE TABLE sunrise(
+             id SERIAL PRIMARY KEY,
+             sunrise_time timestamp NOT NULL,
+             sunset_time timestamp NOT NULL,
+             for_date date NOT NULL,
+             city_id integer NOT NULL)
+
+CREATE INDEX city_id_for_date ON sunrise(for_date, city_id)

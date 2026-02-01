@@ -1,7 +1,7 @@
 config.yml
 initialise_table.py
 fetch_forecast.py
-test.py
+test*.py
 __pycache__/
 data/
 startup.sh

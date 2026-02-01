@@ -1,13 +1,6 @@
 
 #!/usr/bin/env python
 # pylint: disable=unused-argument
-# This program is dedicated to the public domain under the CC0 license.
-
-"""
-Usage:
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
 
 from datetime import datetime, timedelta, time
 import logging
@@ -18,8 +11,8 @@ import assistant
 import db_connector as db
 import area
 
-from telegram import ForceReply, InlineKeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, ConversationHandler, JobQueue, MessageHandler, filters
+from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from functools import wraps
 
 config = yaml.safe_load(open("config.yml"))
@@ -65,9 +58,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def select_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     keyboard = []
-    sorted_areas = sorted(area.cities.values(), key=lambda x: x.human_name, reverse=False)
+    sorted_areas = sorted(area.areas.values(), key=lambda x: x.display_name, reverse=False)
     for area_obj in sorted_areas:
-        keyboard.append([InlineKeyboardButton(area_obj.human_name, callback_data=area_obj.db_int)])
+        keyboard.append([InlineKeyboardButton(area_obj.display_name, callback_data=area_obj.id)])
     await update.message.reply_text(
         "Hi 🌞 Select the location for your predictions:",
         reply_markup=InlineKeyboardMarkup(
@@ -82,13 +75,13 @@ async def select_location_callback(update: Update, context: ContextTypes.DEFAULT
 
     # CallbackQueries need to be answered, even if no notification to the user is needed
     
-    for key, area_obj in area.cities.items():
-        if area_obj.db_int == int(location_id):
+    for key, area_obj in area.areas.items():
+        if area_obj.id == int(location_id):
             print(update.callback_query.from_user.id)
-            print(area_obj.db_int)
+            print(area_obj.id)
             assistant.assign_user_location(update.callback_query.from_user.id, area_obj)
-            await query.answer(text="Great! Your location is set to " + area_obj.human_name)
-            await query.edit_message_text(text="Your location: " + area_obj.human_name)
+            await query.answer(text="Great! Your location is set to " + area_obj.display_name)
+            await query.edit_message_text(text="Your location: " + area_obj.display_name)
             return ConversationHandler.END
         
     await query.answer(
@@ -107,7 +100,6 @@ async def toggle_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("Dynamic updates are now " + text)
 
 async def receive_forecast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # fetch user location from db. for now, default torshov
     text = assistant.morning_forecast(update.message.from_user.id)
     await update.message.reply_text(text)
 
@@ -130,7 +122,7 @@ def schedule_sun_update(app: Application) -> None:
     target_time = time(12, 15, tzinfo=local_timezone)
 
     app.job_queue.run_daily(
-        send_sun_update, target_time, name='kristina-daily-sun', data=datetime.now() + timedelta(minutes=1))
+        send_sun_update, target_time, name='admin-daily-sun', data=datetime.now() + timedelta(minutes=1))
 
 async def send_sun_update(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Running sun forecast analysis...")
@@ -144,7 +136,7 @@ def schedule_morning_forecast(app: Application) -> None:
     target_time = time(7, 15, tzinfo=pytz.timezone('Europe/Oslo'))
 
     app.job_queue.run_daily(
-        receive_forecast, target_time, name='kristina-morning-forecast', data=datetime.now() + timedelta(minutes=1))
+        receive_forecast, target_time, name='admin-morning-forecast', data=datetime.now() + timedelta(minutes=1))
 
 def main() -> None:
     """Starting weather assistant..."""
@@ -169,7 +161,6 @@ def main() -> None:
     )
     application.add_handler(set_location_handler)
 
-    # Run the bot until the user presses Ctrl-C
     schedule_sun_update(application)
     schedule_morning_forecast(application)
 

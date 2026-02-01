@@ -43,7 +43,3 @@ def create_data_json(response_json):
 
         result_list.append(result_dic)
     return result_list
-
-# for testing:
-#with open('/usr/local/python-weather/10-11-2024-oslo-lower-torshov-complete.json', 'r') as f:
-#    data = json.load(f)

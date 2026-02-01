@@ -1,9 +1,9 @@
-import psycopg
+from typing import Optional, TypedDict
 import psycopg_pool
 import area
 import yaml
 import analysis_constants
-from datetime import date
+from datetime import date, timedelta
 from datetime import time
 from datetime import datetime
 
@@ -35,7 +35,7 @@ def insert_into_table(created_at, forecast_time, area: area.Area, data):
                 INSERT INTO forecast_complete(forecast_created_at, forecast_time, area, forecast_data)
                 VALUES(%s, %s, %s, %s) 
                 """,
-                (created_at, forecast_time, area.db_int, data),
+                (created_at, forecast_time, area.id, data),
             )
             conn.commit()
 
@@ -68,7 +68,7 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
 
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute(query, (hour_offset, area.db_int, next_hours))
+            cursor.execute(query, (hour_offset, area.id, next_hours))
             records = cursor.fetchall()
 
             if records:
@@ -117,13 +117,13 @@ def select_related_temperatures(area: area.Area, date):
 
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute(query, (date, date, area.db_int))
+            cursor.execute(query, (date, date, area.id))
             results = cursor.fetchall()
 
             # Process results into a dictionary
             formatted_results = {row[0]: {"avg_temperature": row[1]} for row in results}
 
-            # Ensure all periods are present, even if no data was found for some
+            # in case of missing data
             for period in ["morning", "midday", "evening"]:
                 formatted_results.setdefault(period, {"avg_temperature": None})
 
@@ -133,9 +133,9 @@ def select_related_temperatures(area: area.Area, date):
 def evaluate_clouds(
     area: area.Area,
     date: date,
-    sunrise: time = time(8, 0),
-    sunset: time = time(16, 0),
-):
+    sunrise: time,
+    sunset: time,
+) -> dict[time, float]:
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             # todo - sunrise/sunset times should be dynamic!
@@ -169,7 +169,7 @@ def evaluate_clouds(
                     sunrise.strftime("%H:%M:%S"),
                     sunset.strftime("%H:%M:%S"),
                     date,
-                    area.db_int,
+                    area.id,
                     30.0,
                 ),
             )
@@ -179,8 +179,8 @@ def evaluate_clouds(
 
     return unique_cloud_coverage
 
-
-def evaluate_rain(area: area.Area, date: date):
+# returns precipitation probability by hour
+def evaluate_precipitation(area: area.Area, date: date):
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
@@ -202,8 +202,7 @@ def evaluate_rain(area: area.Area, date: date):
                 """
             try:
                 with conn.cursor() as cursor:
-                    # Execute the query with the specified parameters
-                    cursor.execute(query, (date, date, area.db_int, 40.0))
+                    cursor.execute(query, (date, date, area.id, 40.0))
                     results = cursor.fetchall()
 
                     # Convert results to a set of tuples for unique entries
@@ -252,10 +251,24 @@ def highest_uv_index(area: area.Area, date: date):
                           GROUP BY forecast_time
                       )
                 """
-            cursor.execute(query, (date, date, area.db_int))
+            cursor.execute(query, (date, date, area.id))
             results = cursor.fetchone()
             uv_result = results[0]
             return uv_result
+    
+def store_city_sunset_sunrise_times(area: area.Area, date: date, sunrise: datetime, sunset: datetime):
+    city_id = area.city.city_id
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO sunrise(sunrise_time, sunset_time, for_date, city_id)
+                VALUES(%s, %s, %s, %s)
+                """,
+                (sunrise, sunset, date, city_id)
+            )
+            conn.commit()
+
 
 
 def update_user_location(user_id, area: area.Area):
@@ -263,7 +276,7 @@ def update_user_location(user_id, area: area.Area):
         with conn.cursor() as cur:
             cur.execute(
                 f"INSERT INTO app_profiles(user_id, area) VALUES(%s,%s) ON CONFLICT (user_id) DO UPDATE SET area = EXCLUDED.area;",
-                (user_id, area.db_int),
+                (user_id, area.id),
             )
             conn.commit()
 
@@ -277,8 +290,8 @@ def fetch_user_location(user_id) -> int:
                 return (
                     analysis_constants.default_area_id
                 )  # user has no location assigned, using default
-            for area_ in area.cities.values():
-                if area_.db_int == result[0]:
+            for area_int in area.areas.keys():
+                if area_int == result[0]:
                     return result[0]
 
             return 0
@@ -292,12 +305,12 @@ def log_forecast(created_at, modified, area: area.Area):
                 INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified, area) 
                 VALUES (%s, %s, %s)
                 """,
-                (created_at, modified, area.db_int),
+                (created_at, modified, area.id),
             )
             conn.commit()
 
 
-def last_fetch(area: area.Area):
+def last_forecast_fetch(area: area.Area):
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -307,12 +320,44 @@ def last_fetch(area: area.Area):
                 ORDER BY id DESC
                 LIMIT 1
                 """,
-                (area.db_int,),
+                (area.id,),
             )
             result = cur.fetchone()
             if result is None:
                 return datetime.min
             return result[0]
+
+class SunriseTimes(TypedDict):
+    sunrise_time: time
+    sunset_time: time
+
+# todo: move time conversion out of here
+def fetch_sunrise_sunset(area: area.Area, target_date: date, days_before: int=1) -> Optional[SunriseTimes]:
+    start_date = target_date - timedelta(days=days_before)
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                        SELECT sunrise_time, sunset_time
+                        FROM sunrise
+                        WHERE for_date BETWEEN %s AND %s
+                            AND city_id = %s
+                        ORDER BY for_date DESC
+                        LIMIT 1
+                        """,
+                        (start_date, target_date, area.city.city_id),
+                        )
+            row = cur.fetchone()
+            if row:
+                sunrise_utc, sunset_utc = row
+
+                # convert to Oslo timezone
+                sunrise = sunrise_utc.astimezone(area.city.timezone).time()
+                sunset = sunset_utc.astimezone(area.city.timezone).time()
+
+                return SunriseTimes(
+                    sunrise_time=sunrise,
+                    sunset_time=sunset
+                )
 
 
 def toggle_updates(user_id) -> bool:
