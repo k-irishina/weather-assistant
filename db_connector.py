@@ -24,7 +24,10 @@ strconn = """
     database_config["port"],
 )
 
-connpool = psycopg_pool.ConnectionPool(conninfo=strconn, timeout=pool_config["timeout"], max_size=pool_config["max_size"])
+connpool = psycopg_pool.ConnectionPool(
+    conninfo=strconn, timeout=pool_config["timeout"], max_size=pool_config["max_size"]
+)
+
 
 # todo: this should REALLY not be a one-for-one insertion
 def insert_into_table(created_at, forecast_time, area: area.Area, data):
@@ -54,7 +57,7 @@ def select_all_from():
 
 def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offset=0):
 
-    query = f"""
+    query = """
                 SELECT forecast_created_at, forecast_time, forecast_data
                 FROM forecast_complete
                 WHERE forecast_created_at = (
@@ -90,34 +93,49 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
 
 
 def select_related_temperatures(area: area.Area, date):
+    timezone = str(area.region.timezone)
     query = """
-        WITH latest_data AS (
-            SELECT forecast_time, forecast_data,
-                   CASE
-                       WHEN forecast_time::time IN ('06:00:00', '07:00:00', '08:00:00') THEN 'morning'
-                       WHEN forecast_time::time IN ('12:00:00', '13:00:00', '14:00:00') THEN 'midday'
-                       WHEN forecast_time::time IN ('18:00:00', '19:00:00', '20:00:00') THEN 'evening'
-                   END AS time_period
-            FROM forecast_complete
-            WHERE forecast_time::date = %s
-              AND forecast_time::time IN ('06:00:00', '07:00:00', '08:00:00',
-                                       '12:00:00', '13:00:00', '14:00:00',
-                                       '18:00:00', '19:00:00', '20:00:00')
-              AND id IN (
-                  SELECT MAX(id)
-                  FROM forecast_complete
-                  WHERE forecast_time::date = %s AND area =  %s
-                  GROUP BY forecast_time
-              )
-        )
-        SELECT time_period, ROUND(AVG((forecast_data->>'air_temperature')::numeric), 1) AS avg_temperature
-        FROM latest_data
-        GROUP BY time_period;
-    """
+    WITH localized_data AS (
+        SELECT
+            (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %(tz)s::text) AS local_ts,
+            forecast_data,
+            id,
+            forecast_time
+        FROM forecast_complete
+        WHERE area = %(area)s
+    ),
+    latest_rows AS (
+        SELECT *
+        FROM localized_data
+        WHERE local_ts::date = %(target_date)s
+            AND local_ts::time IN (
+              '06:00:00', '07:00:00', '08:00:00',
+              '12:00:00', '13:00:00', '14:00:00',
+              '18:00:00', '19:00:00', '20:00:00'
+            )
+            AND id IN (
+                SELECT MAX(id)
+                FROM forecast_complete
+                WHERE area = %(area)s
+                GROUP BY forecast_time
+            )
+      )
+    SELECT 
+    CASE
+        WHEN local_ts::time IN ('06:00:00', '07:00:00', '08:00:00') THEN 'morning'
+        WHEN local_ts::time IN ('12:00:00', '13:00:00', '14:00:00') THEN 'midday'
+        WHEN local_ts::time IN ('18:00:00', '19:00:00', '20:00:00') THEN 'evening'
+    END AS time_period,
+    ROUND(AVG((forecast_data->>'air_temperature')::numeric), 1) AS avg_temperature
+    FROM latest_rows
+    GROUP BY time_period;
+"""
 
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute(query, (date, date, area.id))
+            cursor.execute(
+                query, ({"tz": timezone, "area": area.id, "target_date": date})
+            )
             results = cursor.fetchall()
 
             # Process results into a dictionary
@@ -136,6 +154,7 @@ def evaluate_clouds(
     sunrise: time,
     sunset: time,
 ) -> dict[time, float]:
+    timezone = str(area.region.timezone)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             # todo - sunrise/sunset times should be dynamic!
@@ -148,7 +167,7 @@ def evaluate_clouds(
                         forecast_data->>'cloud_area_fraction_medium' AS clouds_medium
                         FROM forecast_complete
                         WHERE forecast_time::date = %s
-                          AND forecast_time::time BETWEEN %s AND %s
+                          AND (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %s)::time BETWEEN %s AND %s
                           AND id IN (
                               SELECT MAX(id)
                               FROM forecast_complete
@@ -156,7 +175,7 @@ def evaluate_clouds(
                               GROUP BY forecast_time
                           )
                     )
-                    SELECT clouds_total::numeric, forecast_time::time
+                    SELECT clouds_total::numeric, (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %s)::time
                     FROM latest_data
                     WHERE clouds_total::numeric < %s OR (clouds_low::numeric * 0.7 + clouds_medium::numeric * 0.3 < 35.0 AND clouds_total::numeric < 80.0)
                     ORDER BY forecast_time;
@@ -166,10 +185,12 @@ def evaluate_clouds(
                 query,
                 (
                     date,
+                    timezone,
                     sunrise.strftime("%H:%M:%S"),
                     sunset.strftime("%H:%M:%S"),
                     date,
                     area.id,
+                    timezone,
                     30.0,
                 ),
             )
@@ -178,6 +199,7 @@ def evaluate_clouds(
             unique_cloud_coverage = {row[1]: row[0] for row in results}
 
     return unique_cloud_coverage
+
 
 # returns precipitation probability by hour
 def evaluate_precipitation(area: area.Area, date: date):
@@ -200,21 +222,16 @@ def evaluate_precipitation(area: area.Area, date: date):
                     WHERE precip::numeric > %s
                     ORDER BY forecast_time;
                 """
-            try:
-                with conn.cursor() as cursor:
-                    cursor.execute(query, (date, date, area.id, 40.0))
-                    results = cursor.fetchall()
+            cursor.execute(query, (date, date, area.id, 40.0))
+            results = cursor.fetchall()
 
-                    # Convert results to a set of tuples for unique entries
-                    precip_results = {row[0]: row[1] for row in results}
+            # Convert results to a set of tuples for unique entries
+            precip_results = {row[0]: row[1] for row in results}
 
-            finally:
-                cursor.close()
-
-            return precip_results
+    return precip_results
 
 
-def evaluate_wind(conn, area: area.Area, date: date):
+def evaluate_wind(area: area.Area, date: date):
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             # wind_speed is m/s
@@ -235,6 +252,14 @@ def evaluate_wind(conn, area: area.Area, date: date):
                 WHERE wind_speed::numeric > %s
                 ORDER BY forecast_time;
             """
+            cursor.execute(
+                query, (date, date, area.id, 5.0)
+            )  # Example threshold: 5.0 m/s
+            results = cursor.fetchall()
+
+            wind_results = {row[0]: row[1] for row in results}
+
+    return wind_results
 
 
 def highest_uv_index(area: area.Area, date: date):
@@ -255,27 +280,33 @@ def highest_uv_index(area: area.Area, date: date):
             results = cursor.fetchone()
             uv_result = results[0]
             return uv_result
-    
-def store_city_sunset_sunrise_times(area: area.Area, date: date, sunrise: datetime, sunset: datetime):
-    city_id = area.city.city_id
+
+
+def store_city_sunset_sunrise_times(
+    area: area.Area, date: date, sunrise: datetime, sunset: datetime
+):
+    region_id = area.region.region_id
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO sunrise(sunrise_time, sunset_time, for_date, city_id)
+                INSERT INTO sunrise(sunrise_time, sunset_time, for_date, region_id)
                 VALUES(%s, %s, %s, %s)
                 """,
-                (sunrise, sunset, date, city_id)
+                (sunrise, sunset, date, region_id),
             )
             conn.commit()
-
 
 
 def update_user_location(user_id, area: area.Area):
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"INSERT INTO app_profiles(user_id, area) VALUES(%s,%s) ON CONFLICT (user_id) DO UPDATE SET area = EXCLUDED.area;",
+                """
+                INSERT INTO app_profiles(user_id, area) 
+                VALUES(%s, %s) 
+                ON CONFLICT (user_id) DO UPDATE SET area = EXCLUDED.area;
+                """,
                 (user_id, area.id),
             )
             conn.commit()
@@ -284,7 +315,14 @@ def update_user_location(user_id, area: area.Area):
 def fetch_user_location(user_id) -> int:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT area FROM app_profiles WHERE user_id = %s", (user_id,))
+            cur.execute(
+                """
+                SELECT area 
+                FROM app_profiles 
+                WHERE user_id = %s
+                """,
+                (user_id,),
+            )
             result = cur.fetchone()
             if result is None:
                 return (
@@ -293,7 +331,6 @@ def fetch_user_location(user_id) -> int:
             for area_int in area.areas.keys():
                 if area_int == result[0]:
                     return result[0]
-
             return 0
 
 
@@ -314,8 +351,9 @@ def last_forecast_fetch(area: area.Area):
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"""
-                SELECT forecast_last_modified from forecast_update_log
+                """
+                SELECT forecast_last_modified 
+                FROM forecast_update_log
                 WHERE area = %s
                 ORDER BY id DESC
                 LIMIT 1
@@ -327,45 +365,47 @@ def last_forecast_fetch(area: area.Area):
                 return datetime.min
             return result[0]
 
+
 class SunriseTimes(TypedDict):
     sunrise_time: time
     sunset_time: time
 
+
 # todo: move time conversion out of here
-def fetch_sunrise_sunset(area: area.Area, target_date: date, days_before: int=1) -> Optional[SunriseTimes]:
+def fetch_sunrise_sunset(
+    area: area.Area, target_date: date, days_before: int = 1
+) -> Optional[SunriseTimes]:
     start_date = target_date - timedelta(days=days_before)
     with connpool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                         SELECT sunrise_time, sunset_time
                         FROM sunrise
                         WHERE for_date BETWEEN %s AND %s
-                            AND city_id = %s
+                            AND region_id = %s
                         ORDER BY for_date DESC
                         LIMIT 1
                         """,
-                        (start_date, target_date, area.city.city_id),
-                        )
+                (start_date, target_date, area.region.region_id),
+            )
             row = cur.fetchone()
             if row:
                 sunrise_utc, sunset_utc = row
 
                 # convert to Oslo timezone
-                sunrise = sunrise_utc.astimezone(area.city.timezone).time()
-                sunset = sunset_utc.astimezone(area.city.timezone).time()
+                sunrise = sunrise_utc.astimezone(area.region.timezone).time()
+                sunset = sunset_utc.astimezone(area.region.timezone).time()
 
-                return SunriseTimes(
-                    sunrise_time=sunrise,
-                    sunset_time=sunset
-                )
+                return SunriseTimes(sunrise_time=sunrise, sunset_time=sunset)
 
 
 def toggle_updates(user_id) -> bool:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"""
-                SELECT dynamic_sun_updates from app_profiles
+                """
+                SELECT dynamic_sun_updates FROM app_profiles
                 WHERE user_id = %s
                 """,
                 (user_id,),
@@ -374,7 +414,7 @@ def toggle_updates(user_id) -> bool:
             cur.execute(
                 """
                 UPDATE app_profiles
-                SET dynamic_sun_updates = %b
+                SET dynamic_sun_updates = %s
                 WHERE user_id = %s
                 """,
                 (not enabled, user_id),

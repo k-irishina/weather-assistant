@@ -23,6 +23,6 @@ CREATE TABLE sunrise(
              sunrise_time timestamp NOT NULL,
              sunset_time timestamp NOT NULL,
              for_date date NOT NULL,
-             city_id integer NOT NULL)
+             region_id integer NOT NULL)
 
-CREATE INDEX city_id_for_date ON sunrise(for_date, city_id)
+CREATE INDEX region_id_for_date ON sunrise(for_date, region_id)

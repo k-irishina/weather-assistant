@@ -84,8 +84,8 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
             data = sunrise_sunset_response.json()
             sunrise_response = data["properties"]["sunrise"]["time"]
             sunset_response = data["properties"]["sunset"]["time"]
-            sunrise = convert_to_timezone(sunrise_response, user_area.city.timezone)
-            sunset = convert_to_timezone(sunset_response, user_area.city.timezone)
+            sunrise = convert_to_timezone(sunrise_response, user_area.region.timezone)
+            sunset = convert_to_timezone(sunset_response, user_area.region.timezone)
             logging.info(f"sunrise={sunrise}")
             logging.info(f"sunset={sunset}")
 
