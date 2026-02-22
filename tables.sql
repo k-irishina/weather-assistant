@@ -14,9 +14,10 @@ CREATE TABLE app_profiles(
 
 CREATE TABLE forecast_update_log(
              id SERIAL PRIMARY KEY,
-             forecast_created_at timestamp,
+             forecast_created_at timestamp NOT NULL,
              forecast_last_modified timestamp,
-             area integer)
+             forecast_expire_time timestamp,
+             area integer NOT NULL);
 
 CREATE TABLE sunrise(
              id SERIAL PRIMARY KEY,
@@ -26,3 +27,4 @@ CREATE TABLE sunrise(
              region_id integer NOT NULL)
 
 CREATE INDEX region_id_for_date ON sunrise(for_date, region_id)
+CREATE INDEX idx_forecast_update_log_area ON forecast_update_log(area);

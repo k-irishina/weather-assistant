@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta
 from statistics import mean
 from typing import TypedDict
 
-import analysis_constants
+import analysis_constants as constants
 import area
 import db_connector
 import retrieve_complete_forecast as rcf
@@ -14,13 +14,9 @@ import retrieve_complete_forecast as rcf
 def morning_forecast(user_id):
     # this needs to fetch fresh data
     area_id = db_connector.fetch_user_location(user_id)
-    area_obj = area.areas.get(area_id, area.areas[analysis_constants.default_area_id])
+    area_obj = area.areas.get(area_id, area.areas[constants.default_area_id])
 
-    update_treshold = datetime.now() - timedelta(hours=2)
-    # update forecast if old
-    if db_connector.last_forecast_fetch(area_obj) < update_treshold:
-        log.info('Forecast outdated - fetching new...')
-        rcf.fetch_forecast_for_area_id(area_id)
+    rcf.fetch_forecast_for_area_id(area_id)
 
     # if later in the day, provide tomorrow's forecast
     # todo: user timezone-aware datetime
@@ -48,7 +44,7 @@ def morning_forecast(user_id):
     potentialprcpt = []
 
     for key, value in precipitation_pct_by_hour.items():
-        if key > 60:
+        if key > constants.high_possibility_precipitation:
             highprcpt.append(value.hour)
         else:
             potentialprcpt.append(value.hour)

@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -10,27 +10,39 @@ import db_connector as db
 import json_processor
 import yr_requests
 
+# Configure logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.DEBUG
+)
+log = logging.getLogger(__name__)
+
 # todo: refactor this
 
 def fetch_forecast_for_area_id(area_id):
     user_area = area.areas.get(area_id, area.areas[1])
 
-    last_fetched = db.last_forecast_fetch(user_area)
-    if (last_fetched != 0):
-    ## todo - avoid formatting/unformatting by storing it as a string
-        last_fetched_string = last_fetched.strftime("%a, %d %b %Y %H:%M:%S GMT")
-        print(last_fetched_string)
-    else:
-        last_fetched_string = None
-    ## fetch data
-    response = yr_requests.get_weather_complete(user_area, last_fetched_string)
-    if response.status_code == 304:
-        sys.exit("Forecast not yet updated, no new to store")
-    elif response.status_code != 200:
-        sys.exit("API fetch failed")
+    last_fetch = db.forecast_update_log(user_area)
     
-    print('Response from API:' + str(response.status_code))
-    print('Headers:'+ str(response.headers))
+    if last_fetch and last_fetch.expire_time:
+        expires_dt = last_fetch.expire_time.replace(tzinfo=timezone.utc)
+        if expires_dt > datetime.now(timezone.utc):
+            log.info("Existing forecast still valid, skip calling API")
+            return
+    
+    last_modified = None
+    if last_fetch and last_fetch.last_modified:
+        last_modified = last_fetch.last_modified.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        log.info(f"Last modified: {last_modified}")
+    
+    response = yr_requests.get_weather_complete(user_area, last_modified)
+    if response.status_code == 304:
+        return
+    elif response.status_code != 200:
+        return
+    
+    log.info('Response from API: ' + str(response.status_code))
+    log.debug('Headers: ' + str(response.headers))
     
     data = response.json()
     
@@ -45,12 +57,15 @@ def fetch_forecast_for_area_id(area_id):
         json.dump(response.json(), f, indent=4)
     
     forecast_created_at = json_processor.forecast_created_at(data)
+
     # this is a *list* of jsons!
     db_data = json_processor.create_data_json(data)
     
     # audit
     last_modified_header = datetime.strptime(response.headers['Last-Modified'], "%a, %d %b %Y %H:%M:%S GMT")
-    db.log_forecast(forecast_created_at, str(last_modified_header), user_area)
+    forecast_expiry_time = datetime.strptime(response.headers['Expires'], "%a, %d %b %Y %H:%M:%S GMT")
+
+    db.log_forecast(forecast_created_at, str(last_modified_header), str(forecast_expiry_time), user_area)
     
     for time in db_data:
         db.insert_into_table(forecast_created_at, time.get('forecast_time'), user_area, json.dumps(time, indent=4))
@@ -72,13 +87,13 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
         # we don't require high accuracy here, so 10 days is acceptable
     sunrise_sunset_stored = db.fetch_sunrise_sunset(user_area, date_today, 10)
     if sunrise_sunset_stored:
-        logging.info("returning stored sun data")
+        log.info("returning stored sun data")
         return sunrise_sunset_stored
     else:
-        logging.info("fetching new sun data from MET")
+        log.info("fetching new sun data from MET")
         sunrise_sunset_response = yr_requests.get_celestial(user_area, date_today)
         if sunrise_sunset_response.status_code != 200:
-            logging.error("Failed to call Sunrise API, returning default")
+            log.error("Failed to call Sunrise API, returning default")
             return {"sunrise_time": time(7, 00), "sunset_time": time(17, 00)}
         else:
             data = sunrise_sunset_response.json()
@@ -86,10 +101,9 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
             sunset_response = data["properties"]["sunset"]["time"]
             sunrise = time_of_timezone(sunrise_response, user_area.region.timezone)
             sunset = time_of_timezone(sunset_response, user_area.region.timezone)
-            logging.info(f"sunrise={sunrise}")
-            logging.info(f"sunset={sunset}")
-
-            logging.info("Storing sun info to DB.")
+            log.info(f"sunrise={sunrise}")
+            log.info(f"sunset={sunset}")
+            log.info("Storing sun info to DB.")
             db.store_city_sunset_sunrise_times(user_area, date_today, datetime.fromisoformat(sunrise_response), datetime.fromisoformat(sunset_response))
 
             return {

@@ -1,5 +1,5 @@
 from datetime import date, datetime, time, timedelta
-from typing import Optional, TypedDict
+from typing import Optional, TypedDict, NamedTuple
 
 import psycopg_pool
 import yaml
@@ -27,6 +27,11 @@ strconn = """
 connpool = psycopg_pool.ConnectionPool(
     conninfo=strconn, timeout=pool_config["timeout"], max_size=pool_config["max_size"]
 )
+
+
+class ForecastFetch(NamedTuple):
+    last_modified: datetime
+    expire_time: datetime
 
 
 # todo: this should REALLY not be a one-for-one insertion
@@ -201,7 +206,6 @@ def evaluate_clouds(
     return unique_cloud_coverage
 
 
-# returns precipitation probability by hour
 def evaluate_precipitation(area: area.Area, date: date):
     timezone = str(area.region.timezone)
     with connpool.connection() as conn:
@@ -335,25 +339,25 @@ def fetch_user_location(user_id) -> int:
             return 0
 
 
-def log_forecast(created_at, modified, area: area.Area):
+def log_forecast(created_at, modified, expires, area: area.Area):
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified, area) 
-                VALUES (%s, %s, %s)
+                INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified, forecast_expire_time, area) 
+                VALUES (%s, %s, %s, %s)
                 """,
-                (created_at, modified, area.id),
+                (created_at, modified, expires, area.id),
             )
             conn.commit()
 
 
-def last_forecast_fetch(area: area.Area):
+def forecast_update_log(area: area.Area) -> Optional[ForecastFetch]:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT forecast_last_modified 
+                SELECT forecast_last_modified, forecast_expire_time
                 FROM forecast_update_log
                 WHERE area = %s
                 ORDER BY id DESC
@@ -363,8 +367,8 @@ def last_forecast_fetch(area: area.Area):
             )
             result = cur.fetchone()
             if result is None:
-                return datetime.min
-            return result[0]
+                return None
+            return ForecastFetch(result[0], result[1])
 
 
 class SunriseTimes(TypedDict):
