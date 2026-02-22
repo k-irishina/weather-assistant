@@ -1,11 +1,11 @@
+from datetime import date, datetime, time, timedelta
 from typing import Optional, TypedDict
+
 import psycopg_pool
-import area
 import yaml
+
 import analysis_constants
-from datetime import date, timedelta
-from datetime import time
-from datetime import datetime
+import area
 
 config = yaml.safe_load(open("config.yml"))
 database_config = config["database"]
@@ -203,6 +203,7 @@ def evaluate_clouds(
 
 # returns precipitation probability by hour
 def evaluate_precipitation(area: area.Area, date: date):
+    timezone = str(area.region.timezone)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
@@ -217,12 +218,12 @@ def evaluate_precipitation(area: area.Area, date: date):
                               GROUP BY forecast_time
                           )
                     )
-                    SELECT precip::numeric, forecast_time::time
+                    SELECT precip::numeric, (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %s)::time
                     FROM latest_data
-                    WHERE precip::numeric > %s
+                    WHERE precip::numeric >= %s
                     ORDER BY forecast_time;
                 """
-            cursor.execute(query, (date, date, area.id, 40.0))
+            cursor.execute(query, (date, date, area.id, timezone, 20.0))
             results = cursor.fetchall()
 
             # Convert results to a set of tuples for unique entries
@@ -370,8 +371,6 @@ class SunriseTimes(TypedDict):
     sunrise_time: time
     sunset_time: time
 
-
-# todo: move time conversion out of here
 def fetch_sunrise_sunset(
     area: area.Area, target_date: date, days_before: int = 1
 ) -> Optional[SunriseTimes]:
@@ -410,7 +409,11 @@ def toggle_updates(user_id) -> bool:
                 """,
                 (user_id,),
             )
-            enabled = cur.fetchone()[0]
+            row = cur.fetchone()
+            if row is None:
+                enabled = False
+            else:
+                enabled = row[0]
             cur.execute(
                 """
                 UPDATE app_profiles

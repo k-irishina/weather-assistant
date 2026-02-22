@@ -1,5 +1,6 @@
-from zoneinfo import ZoneInfo
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo
+
 
 @dataclass(frozen=True)
 class Region:

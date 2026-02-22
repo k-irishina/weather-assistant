@@ -1,14 +1,14 @@
-from zoneinfo import ZoneInfo
-import json_processor
-import db_connector as db
 import json
-import area
-import yr_requests
-import sys
 import logging
-from datetime import datetime, time
+import sys
+from datetime import date, datetime, time
 from pathlib import Path
-from datetime import date
+from zoneinfo import ZoneInfo
+
+import area
+import db_connector as db
+import json_processor
+import yr_requests
 
 # todo: refactor this
 
@@ -84,8 +84,8 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
             data = sunrise_sunset_response.json()
             sunrise_response = data["properties"]["sunrise"]["time"]
             sunset_response = data["properties"]["sunset"]["time"]
-            sunrise = convert_to_timezone(sunrise_response, user_area.region.timezone)
-            sunset = convert_to_timezone(sunset_response, user_area.region.timezone)
+            sunrise = time_of_timezone(sunrise_response, user_area.region.timezone)
+            sunset = time_of_timezone(sunset_response, user_area.region.timezone)
             logging.info(f"sunrise={sunrise}")
             logging.info(f"sunset={sunset}")
 
@@ -97,7 +97,7 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
                 "sunset_time": sunset
             }
 
-def convert_to_timezone(iso_str: str, tz: ZoneInfo) -> time:
+def time_of_timezone(iso_str: str, tz: ZoneInfo) -> time:
     dt = datetime.fromisoformat(iso_str)
 
     if dt.tzinfo is None:

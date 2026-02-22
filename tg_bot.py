@@ -2,18 +2,21 @@
 #!/usr/bin/env python
 # pylint: disable=unused-argument
 
-from datetime import datetime, timedelta, time
 import logging
+from datetime import datetime, time, timedelta
+from functools import wraps
 
 import pytz
 import yaml
+from telegram import (ForceReply, InlineKeyboardButton, InlineKeyboardMarkup,
+                      Update)
+from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
+                          ContextTypes, ConversationHandler, MessageHandler,
+                          filters)
+
+import area
 import assistant
 import db_connector as db
-import area
-
-from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
-from functools import wraps
 
 config = yaml.safe_load(open("config.yml"))
 
@@ -39,10 +42,11 @@ def my_handler(update, context):
 
 # Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+level=logging.DEBUG,  # Set the logging level to DEBUG
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
-logging.getLogger("httpx").setLevel(logging.WARNING)
+# logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +56,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
     await update.message.reply_html(
-        rf"Hi {user.mention_html()}!",
+        rf"""Hi {user.mention_html()}, welcome to your Weather Assistant Bot! 🌤\n
+        Type /help to see what I can do.""",
         reply_markup=ForceReply(selective=True),
     )
 
@@ -140,7 +145,6 @@ def schedule_morning_forecast(app: Application) -> None:
 
 def main() -> None:
     """Starting weather assistant..."""
-
     token = config['telegram']['token']
     application = Application.builder().token(token).build()
 
