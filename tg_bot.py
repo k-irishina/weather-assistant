@@ -3,28 +3,27 @@
 # pylint: disable=unused-argument
 
 import logging
-from datetime import datetime, time, timedelta
+from datetime import time
 from functools import wraps
 
-import pytz
-import yaml
 from telegram import (ForceReply, InlineKeyboardButton, InlineKeyboardMarkup,
                       Update)
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           ContextTypes, ConversationHandler, MessageHandler,
                           filters)
 
+import analysis_constants
+import app_config
 import area
 import assistant
 import db_connector as db
 
-config = yaml.safe_load(open("config.yml"))
+LIST_OF_ADMINS = app_config.users["admin-users"]
+TEST_USERS = app_config.users["test-users"]
 
-LIST_OF_ADMINS = config["users"]["admin-users"]
-TEST_USERS =  config["users"]["test-users"]
-
-UTC = pytz.UTC
-OK = range(1)
+# The daily jobs run on a single shared clock: the default area's timezone.
+# Per-user send times would need one job per user, tracked separately.
+SCHEDULE_TIMEZONE = area.areas[analysis_constants.default_area_id].region.timezone
 
 def restricted(func):
     @wraps(func)
@@ -35,10 +34,6 @@ def restricted(func):
             return
         return func(update, context, *args, **kwargs)
     return wrapped
-
-@restricted
-def my_handler(update, context):
-    pass  # only accessible if `user_id` is in `LIST_OF_ADMINS`.
 
 # Enable logging
 logging.basicConfig(
@@ -61,7 +56,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=ForceReply(selective=True),
     )
 
-async def select_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def select_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = []
     sorted_areas = sorted(area.areas.values(), key=lambda x: x.display_name, reverse=False)
     for area_obj in sorted_areas:
@@ -72,9 +67,8 @@ async def select_location(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             keyboard
         )
     )
-    return OK
 
-async def select_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def select_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     location_id = update.callback_query.data
 
@@ -82,18 +76,15 @@ async def select_location_callback(update: Update, context: ContextTypes.DEFAULT
     
     for key, area_obj in area.areas.items():
         if area_obj.id == int(location_id):
-            print(update.callback_query.from_user.id)
-            print(area_obj.id)
-            assistant.assign_user_location(update.callback_query.from_user.id, area_obj)
+            logger.debug("User %s selected area %s", query.from_user.id, area_obj.id)
+            assistant.assign_user_location(query.from_user.id, area_obj)
             await query.answer(text="Great! Your location is set to " + area_obj.display_name)
             await query.edit_message_text(text="Your location: " + area_obj.display_name)
-            return ConversationHandler.END
-        
-    await query.answer(
-    "Location is invalid, please choose from selection."
-    )
-    return ConversationHandler.END
-    
+            return
+
+    await query.answer("Location is invalid, please choose from selection.")
+
+
 async def see_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     area_name = assistant.fetch_user_location(user_id)
@@ -117,35 +108,59 @@ Current functionality is still quite limited, but nice nevertheless!
 If I don't respond to your command, I'm probably asleep.
                                     """)
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Echo the user message."""
-    await update.message.reply_text(update.message.text)
-
 def schedule_sun_update(app: Application) -> None:
-    #job_time = datetime.now(UTC) + timedelta(minutes=1)
-    local_timezone = pytz.timezone('Europe/Oslo')
-    target_time = time(12, 15, tzinfo=local_timezone)
+    target_time = time(12, 15, tzinfo=SCHEDULE_TIMEZONE)
 
     app.job_queue.run_daily(
-        send_sun_update, target_time, name='admin-daily-sun', data=datetime.now() + timedelta(minutes=1))
+        send_sun_update, target_time, name='admin-daily-sun')
 
 async def send_sun_update(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Running sun forecast analysis...")
-    # todo: check users for subscription, get their location, send
     for user_id in db.dynamic_update_users():
-        if user_id in TEST_USERS:
+        if user_id not in TEST_USERS:
+            continue
+        try:
             sun_change_text = assistant.detect_sun_change(user_id)
+        except Exception:
+            logger.exception("Could not analyse sun change for %s", user_id)
+            continue
+        # None means "nothing changed worth reporting", which is the usual case
+        if sun_change_text:
             await context.bot.send_message(user_id, text=sun_change_text)
 
 def schedule_morning_forecast(app: Application) -> None:
-    target_time = time(7, 15, tzinfo=pytz.timezone('Europe/Oslo'))
+    target_time = time(7, 15, tzinfo=SCHEDULE_TIMEZONE)
 
     app.job_queue.run_daily(
-        receive_forecast, target_time, name='admin-morning-forecast', data=datetime.now() + timedelta(minutes=1))
+        send_morning_forecast, target_time, name='admin-morning-forecast')
+
+
+async def send_morning_forecast(context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("Sending scheduled morning forecast...")
+    for user_id in db.dynamic_update_users():
+        if user_id not in TEST_USERS:
+            continue
+        try:
+            text = assistant.morning_forecast(user_id)
+        except Exception:
+            logger.exception("Could not build morning forecast for %s", user_id)
+            continue
+        if text:
+            await context.bot.send_message(user_id, text=text)
+
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.exception("Unhandled error while processing update", exc_info=context.error)
+
+    message = getattr(update, "effective_message", None)
+    if message is not None:
+        await message.reply_text(
+            "Something went wrong working out your forecast. Please try again in a bit."
+        )
+
 
 def main() -> None:
     """Starting weather assistant..."""
-    token = config['telegram']['token']
+    token = app_config.telegram['token']
     application = Application.builder().token(token).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -156,19 +171,12 @@ def main() -> None:
     application.add_handler(CommandHandler("updates", toggle_updates))
     application.add_handler(CallbackQueryHandler(select_location_callback))
 
-    set_location_handler = ConversationHandler(
-        entry_points=[CommandHandler("location", select_location)],
-        states={
-           OK: [MessageHandler(filters.TEXT, select_location_callback)],
-        },
-        fallbacks=[],
-    )
-    application.add_handler(set_location_handler)
+    application.add_error_handler(on_error)
 
     schedule_sun_update(application)
     schedule_morning_forecast(application)
 
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=5.0, read_timeout= 20.0, connect_timeout=20.0, write_timeout=20.0)
 
 if __name__ == "__main__":
     main()

@@ -15,3 +15,6 @@ met-api:
 users:
   test-users: [111111, 22222]
   admin-users: [111111, 22222]
+data:
+  # Leave unset (or null) to keep every file, which is the default.
+  retention-days: null

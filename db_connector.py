@@ -2,26 +2,21 @@ from datetime import date, datetime, time, timedelta
 from typing import Optional, TypedDict, NamedTuple
 
 import psycopg_pool
-import yaml
+from psycopg.conninfo import make_conninfo
 
 import analysis_constants
 import area
+import app_config
 
-config = yaml.safe_load(open("config.yml"))
-database_config = config["database"]
-pool_config = config["database"]["pool"]
-strconn = """
-        dbname=%s 
-        user=%s 
-        host=%s 
-        password=%s 
-        port=%s 
-        """ % (
-    database_config["name"],
-    database_config["user"],
-    database_config["host"],
-    database_config["password"],
-    database_config["port"],
+database_config = app_config.database
+pool_config = database_config["pool"]
+
+strconn = make_conninfo(
+    dbname=database_config["name"],
+    user=database_config["user"],
+    host=database_config["host"],
+    password=database_config["password"],
+    port=database_config["port"],
 )
 
 connpool = psycopg_pool.ConnectionPool(
@@ -29,69 +24,74 @@ connpool = psycopg_pool.ConnectionPool(
 )
 
 
+def local_day_bounds(area: area.Area, target_date: date) -> tuple[datetime, datetime]:
+    timezone = area.region.timezone
+    start = datetime.combine(target_date, time.min, tzinfo=timezone)
+    end = datetime.combine(target_date + timedelta(days=1), time.min, tzinfo=timezone)
+    return start, end
+
+
 class ForecastFetch(NamedTuple):
     last_modified: datetime
     expire_time: datetime
 
 
-# todo: this should REALLY not be a one-for-one insertion
-def insert_into_table(created_at, forecast_time, area: area.Area, data):
+def insert_forecast_rows(created_at, area: area.Area, rows) -> int:
+    values = [(created_at, forecast_time, area.id, data) for forecast_time, data in rows]
+    if not values:
+        return 0
     with connpool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
+            cur.executemany(
                 """
                 INSERT INTO forecast_complete(forecast_created_at, forecast_time, area, forecast_data)
-                VALUES(%s, %s, %s, %s) 
+                VALUES(%s, %s, %s, %s)
                 """,
-                (created_at, forecast_time, area.id, data),
+                values,
             )
-            conn.commit()
-
-
-def select_all_from():
-    with connpool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                        SELECT * FROM forecast_complete
-                        """
-            )
-            result = cur.fetchall()
-            print(result)
+        conn.commit()
+    return len(values)
 
 
 def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offset=0):
-
     query = """
                 SELECT forecast_created_at, forecast_time, forecast_data
                 FROM forecast_complete
-                WHERE forecast_created_at = (
-                    SELECT MAX(forecast_created_at)
-                    FROM forecast_complete
-                    WHERE forecast_created_at <= NOW() - (%s * INTERVAL '1 hour')
-                    AND area = %s
-                )
-                AND forecast_time BETWEEN NOW() AND NOW() + INTERVAL '%s hours'
+                WHERE area = %(area)s
+                  AND forecast_created_at = (
+                      SELECT MAX(forecast_created_at)
+                      FROM forecast_complete
+                      WHERE forecast_created_at <= NOW() - make_interval(hours => %(hour_offset)s)
+                        AND area = %(area)s
+                  )
+                  AND forecast_time BETWEEN NOW() AND NOW() + make_interval(hours => %(next_hours)s)
             """
 
+    timezone = area.region.timezone
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute(query, (hour_offset, area.id, next_hours))
+            cursor.execute(
+                query,
+                {
+                    "area": area.id,
+                    "hour_offset": hour_offset,
+                    "next_hours": next_hours,
+                },
+            )
             records = cursor.fetchall()
 
-            if records:
-                print("records found")
-            else:
-                print("no records")
-
             formatted_records = []
-            for record in records:
-                t_created_at = record[0].strftime("%Y-%m-%d %H:%M:%S")
-                t_time = record[1].strftime("%Y-%m-%d %H:%M:%S")
-                data = record[2]
-
+            for created_at, forecast_time, data in records:
                 formatted_records.append(
-                    {"created_at": t_created_at, "forecast_time": t_time, "data": data}
+                    {
+                        "created_at": created_at.astimezone(timezone).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "forecast_time": forecast_time.astimezone(timezone).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "data": data,
+                    }
                 )
 
     return formatted_records
@@ -99,10 +99,11 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
 
 def select_related_temperatures(area: area.Area, date):
     timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
     query = """
     WITH localized_data AS (
         SELECT
-            (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %(tz)s::text) AS local_ts,
+            (forecast_time AT TIME ZONE %(tz)s) AS local_ts,
             forecast_data,
             id,
             forecast_time
@@ -112,7 +113,7 @@ def select_related_temperatures(area: area.Area, date):
     latest_rows AS (
         SELECT *
         FROM localized_data
-        WHERE local_ts::date = %(target_date)s
+        WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
             AND local_ts::time IN (
               '06:00:00', '07:00:00', '08:00:00',
               '12:00:00', '13:00:00', '14:00:00',
@@ -139,7 +140,13 @@ def select_related_temperatures(area: area.Area, date):
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
-                query, ({"tz": timezone, "area": area.id, "target_date": date})
+                query,
+                {
+                    "tz": timezone,
+                    "area": area.id,
+                    "day_start": day_start,
+                    "day_end": day_end,
+                },
             )
             results = cursor.fetchall()
 
@@ -160,83 +167,97 @@ def evaluate_clouds(
     sunset: time,
 ) -> dict[time, float]:
     timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
-            # todo - sunrise/sunset times should be dynamic!
-            # fetch from
-            # https://docs.api.met.no/doc/sunrise/celestial.html
             query = """
                     WITH latest_data AS (
                         SELECT forecast_time, forecast_data->>'cloud_area_fraction' AS clouds_total,
                         forecast_data->>'cloud_area_fraction_low' AS clouds_low,
                         forecast_data->>'cloud_area_fraction_medium' AS clouds_medium
                         FROM forecast_complete
-                        WHERE forecast_time::date = %s
-                          AND (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %s)::time BETWEEN %s AND %s
+                        WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                          AND (forecast_time AT TIME ZONE %(tz)s)::time BETWEEN %(sunrise)s AND %(sunset)s
+                          AND area = %(area)s
                           AND id IN (
                               SELECT MAX(id)
                               FROM forecast_complete
-                              WHERE forecast_time::date = %s AND area = %s
+                              WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                                AND area = %(area)s
                               GROUP BY forecast_time
                           )
                     )
-                    SELECT clouds_total::numeric, (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %s)::time
+                    SELECT (forecast_time AT TIME ZONE %(tz)s)::time,
+                           clouds_total::numeric, clouds_low::numeric, clouds_medium::numeric
                     FROM latest_data
-                    WHERE clouds_total::numeric < %s OR (clouds_low::numeric * 0.7 + clouds_medium::numeric * 0.3 < 35.0 AND clouds_total::numeric < 80.0)
                     ORDER BY forecast_time;
                 """
-            # Execute the query with the specified parameters
             cursor.execute(
                 query,
-                (
-                    date,
-                    timezone,
-                    sunrise.strftime("%H:%M:%S"),
-                    sunset.strftime("%H:%M:%S"),
-                    date,
-                    area.id,
-                    timezone,
-                    30.0,
-                ),
+                {
+                    "tz": timezone,
+                    "day_start": day_start,
+                    "day_end": day_end,
+                    "sunrise": sunrise.strftime("%H:%M:%S"),
+                    "sunset": sunset.strftime("%H:%M:%S"),
+                    "area": area.id,
+                },
             )
             results = cursor.fetchall()
 
-            unique_cloud_coverage = {row[1]: row[0] for row in results}
+            unique_cloud_coverage = {
+                hour: total
+                for hour, total, low, medium in results
+                if analysis_constants.is_sunny(total, low, medium)
+            }
 
     return unique_cloud_coverage
 
 
-def evaluate_precipitation(area: area.Area, date: date):
+def evaluate_precipitation(area: area.Area, date: date) -> dict[time, float]:
     timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
                     WITH latest_data AS (
                     SELECT forecast_time, forecast_data->'next_1_hours'->>'probability_of_precipitation' AS precip
                         FROM forecast_complete
-                        WHERE forecast_time::date = %s
+                        WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                          AND area = %(area)s
                           AND id IN (
                               SELECT MAX(id)
                               FROM forecast_complete
-                              WHERE forecast_time::date = %s AND area = %s
+                              WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                                AND area = %(area)s
                               GROUP BY forecast_time
                           )
                     )
-                    SELECT precip::numeric, (forecast_time AT TIME ZONE 'UTC' AT TIME ZONE %s)::time
+                    SELECT (forecast_time AT TIME ZONE %(tz)s)::time, precip::numeric
                     FROM latest_data
-                    WHERE precip::numeric >= %s
+                    WHERE precip::numeric >= %(min_probability)s
                     ORDER BY forecast_time;
                 """
-            cursor.execute(query, (date, date, area.id, timezone, 20.0))
+            cursor.execute(
+                query,
+                {
+                    "tz": timezone,
+                    "day_start": day_start,
+                    "day_end": day_end,
+                    "area": area.id,
+                    "min_probability": analysis_constants.min_precipitation_probability,
+                },
+            )
             results = cursor.fetchall()
 
-            # Convert results to a set of tuples for unique entries
             precip_results = {row[0]: row[1] for row in results}
 
     return precip_results
 
 
 def evaluate_wind(area: area.Area, date: date):
+    timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             # wind_speed is m/s
@@ -244,22 +265,31 @@ def evaluate_wind(area: area.Area, date: date):
                 WITH latest_data AS (
                     SELECT forecast_time, forecast_data->>'wind_speed' AS wind_speed
                     FROM forecast_complete
-                    WHERE forecast_time::date = %s
+                    WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                      AND area = %(area)s
                       AND id IN (
                           SELECT MAX(id)
                           FROM forecast_complete
-                          WHERE forecast_time::date = %s AND area = %s
+                          WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                            AND area = %(area)s
                           GROUP BY forecast_time
                       )
                 )
-                SELECT forecast_time::time, wind_speed::numeric
+                SELECT (forecast_time AT TIME ZONE %(tz)s)::time, wind_speed::numeric
                 FROM latest_data
-                WHERE wind_speed::numeric > %s
+                WHERE wind_speed::numeric > %(min_wind_speed)s
                 ORDER BY forecast_time;
             """
             cursor.execute(
-                query, (date, date, area.id, 5.0)
-            )  # Example threshold: 5.0 m/s
+                query,
+                {
+                    "tz": timezone,
+                    "day_start": day_start,
+                    "day_end": day_end,
+                    "area": area.id,
+                    "min_wind_speed": analysis_constants.min_wind_speed,  # m/s
+                },
+            )
             results = cursor.fetchall()
 
             wind_results = {row[0]: row[1] for row in results}
@@ -268,20 +298,32 @@ def evaluate_wind(area: area.Area, date: date):
 
 
 def highest_uv_index(area: area.Area, date: date):
+    timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
                     SELECT MAX((forecast_data->>'ultraviolet_index_clear_sky')::numeric) AS uv_index
                     FROM forecast_complete
-                    WHERE forecast_time::date = %s
+                    WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                      AND area = %(area)s
                       AND id IN (
                           SELECT MAX(id)
                           FROM forecast_complete
-                          WHERE forecast_time::date = %s AND area = %s
+                          WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                            AND area = %(area)s
                           GROUP BY forecast_time
                       )
                 """
-            cursor.execute(query, (date, date, area.id))
+            cursor.execute(
+                query,
+                {
+                    "tz": timezone,
+                    "day_start": day_start,
+                    "day_end": day_end,
+                    "area": area.id,
+                },
+            )
             results = cursor.fetchone()
             uv_result = results[0]
             return uv_result
@@ -329,14 +371,9 @@ def fetch_user_location(user_id) -> int:
                 (user_id,),
             )
             result = cur.fetchone()
-            if result is None:
-                return (
-                    analysis_constants.default_area_id
-                )  # user has no location assigned, using default
-            for area_int in area.areas.keys():
-                if area_int == result[0]:
-                    return result[0]
-            return 0
+            if result is None or result[0] not in area.areas:
+                return analysis_constants.default_area_id # user has no location assigned, using default
+            return result[0]
 
 
 def log_forecast(created_at, modified, expires, area: area.Area):
@@ -396,11 +433,11 @@ def fetch_sunrise_sunset(
             if row:
                 sunrise_utc, sunset_utc = row
 
-                # convert to Oslo timezone
                 sunrise = sunrise_utc.astimezone(area.region.timezone).time()
                 sunset = sunset_utc.astimezone(area.region.timezone).time()
 
                 return SunriseTimes(sunrise_time=sunrise, sunset_time=sunset)
+            return None
 
 
 def toggle_updates(user_id) -> bool:
@@ -408,26 +445,17 @@ def toggle_updates(user_id) -> bool:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT dynamic_sun_updates FROM app_profiles
-                WHERE user_id = %s
+                INSERT INTO app_profiles(user_id, dynamic_sun_updates)
+                VALUES (%s, TRUE)
+                ON CONFLICT (user_id) DO UPDATE
+                SET dynamic_sun_updates = NOT COALESCE(app_profiles.dynamic_sun_updates, FALSE)
+                RETURNING dynamic_sun_updates
                 """,
                 (user_id,),
             )
-            row = cur.fetchone()
-            if row is None:
-                enabled = False
-            else:
-                enabled = row[0]
-            cur.execute(
-                """
-                UPDATE app_profiles
-                SET dynamic_sun_updates = %s
-                WHERE user_id = %s
-                """,
-                (not enabled, user_id),
-            )
+            enabled = cur.fetchone()[0]
             conn.commit()
-            return not enabled
+            return enabled
 
 
 def dynamic_update_users() -> list:

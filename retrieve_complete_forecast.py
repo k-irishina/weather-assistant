@@ -1,10 +1,12 @@
 import json
 import logging
-import sys
-from datetime import date, datetime, time, timezone
+import time as time_module
+from datetime import datetime, time, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import analysis_constants as constants
+import app_config
 import area
 import db_connector as db
 import json_processor
@@ -19,20 +21,58 @@ log = logging.getLogger(__name__)
 
 # todo: refactor this
 
+def prune_old_responses(data_dir: Path) -> int:
+    """Delete saved MET responses older than the configured retention.
+
+    Off unless `data.retention-days` is set in config.yml: these files are the
+    only copy of the raw responses, and they were what made a database rebuild
+    possible.
+    """
+    retention_days = app_config.data_retention_days
+    if not retention_days:
+        return 0
+
+    cutoff = time_module.time() - retention_days * 86400
+    removed = 0
+    for path in data_dir.glob("*.json"):
+        if path.stat().st_mtime < cutoff:
+            path.unlink()
+            removed += 1
+    if removed:
+        log.info(f"Pruned {removed} response files older than {retention_days} days")
+    return removed
+
+
+def parse_utc(iso_str: str) -> datetime:
+    """Parse an ISO-8601 instant from MET into a tz-aware UTC datetime."""
+    dt = datetime.fromisoformat(iso_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def parse_http_date(header_value: str) -> datetime:
+    """Parse an HTTP date header, which RFC 9110 defines as always GMT."""
+    return datetime.strptime(header_value, "%a, %d %b %Y %H:%M:%S GMT").replace(
+        tzinfo=timezone.utc
+    )
+
+
 def fetch_forecast_for_area_id(area_id):
-    user_area = area.areas.get(area_id, area.areas[1])
+    user_area = area.areas.get(area_id, area.areas[constants.default_area_id])
 
     last_fetch = db.forecast_update_log(user_area)
     
     if last_fetch and last_fetch.expire_time:
-        expires_dt = last_fetch.expire_time.replace(tzinfo=timezone.utc)
-        if expires_dt > datetime.now(timezone.utc):
+        if last_fetch.expire_time > datetime.now(timezone.utc):
             log.info("Existing forecast still valid, skip calling API")
             return
-    
+
     last_modified = None
     if last_fetch and last_fetch.last_modified:
-        last_modified = last_fetch.last_modified.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        last_modified = last_fetch.last_modified.astimezone(timezone.utc).strftime(
+            "%a, %d %b %Y %H:%M:%S GMT"
+        )
         log.info(f"Last modified: {last_modified}")
     
     response = yr_requests.get_weather_complete(user_area, last_modified)
@@ -54,36 +94,36 @@ def fetch_forecast_for_area_id(area_id):
     jsonname = datetime.today().strftime("%d-%m-%Y-%H:%M-") + f"{user_area.display_name}-complete.json"
     json_path = DATA_DIR / jsonname
     with json_path.open('w') as f:
-        json.dump(response.json(), f, indent=4)
+        json.dump(data, f, indent=4)
+
+    #prune_old_responses(DATA_DIR)
     
-    forecast_created_at = json_processor.forecast_created_at(data)
+    forecast_created_at = parse_utc(json_processor.forecast_created_at(data))
 
     # this is a *list* of jsons!
     db_data = json_processor.create_data_json(data)
-    
-    # audit
-    last_modified_header = datetime.strptime(response.headers['Last-Modified'], "%a, %d %b %Y %H:%M:%S GMT")
-    forecast_expiry_time = datetime.strptime(response.headers['Expires'], "%a, %d %b %Y %H:%M:%S GMT")
 
-    db.log_forecast(forecast_created_at, str(last_modified_header), str(forecast_expiry_time), user_area)
-    
-    for time in db_data:
-        db.insert_into_table(forecast_created_at, time.get('forecast_time'), user_area, json.dumps(time, indent=4))
+    # audit
+    last_modified_header = parse_http_date(response.headers['Last-Modified'])
+    forecast_expiry_time = parse_http_date(response.headers['Expires'])
+
+    db.log_forecast(forecast_created_at, last_modified_header, forecast_expiry_time, user_area)
+
+    inserted = db.insert_forecast_rows(
+        forecast_created_at,
+        user_area,
+        ((parse_utc(entry['forecast_time']), json.dumps(entry)) for entry in db_data),
+    )
+    log.info(f"Stored {inserted} forecast hours for {user_area.display_name}")
 
 def fetch_forecast_for_user(user_id):
-    area_id = db.fetch_user_location(user_id)
-    if area_id == 0:
-        sys.exit("No area registered for user")
-    return fetch_forecast_for_area_id(area_id)
+    return fetch_forecast_for_area_id(db.fetch_user_location(user_id))
 
 # todo: replace with running https://github.com/metno/celestial
 def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
     area_id = db.fetch_user_location(user_id)
-    user_area = area.areas.get(area_id, area.areas[1])
-    date_today = date.today()
-    if area_id == 0:
-        sys.exit("No area registered for user")
-        # conversion is on db connector. that should be changed
+    user_area = area.areas.get(area_id, area.areas[constants.default_area_id])
+    date_today = user_area.region.today()
         # we don't require high accuracy here, so 10 days is acceptable
     sunrise_sunset_stored = db.fetch_sunrise_sunset(user_area, date_today, 10)
     if sunrise_sunset_stored:
@@ -104,7 +144,12 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
             log.info(f"sunrise={sunrise}")
             log.info(f"sunset={sunset}")
             log.info("Storing sun info to DB.")
-            db.store_city_sunset_sunrise_times(user_area, date_today, datetime.fromisoformat(sunrise_response), datetime.fromisoformat(sunset_response))
+            db.store_city_sunset_sunrise_times(
+                user_area,
+                date_today,
+                parse_utc(sunrise_response),
+                parse_utc(sunset_response),
+            )
 
             return {
                 "sunrise_time": sunrise,
@@ -112,11 +157,5 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
             }
 
 def time_of_timezone(iso_str: str, tz: ZoneInfo) -> time:
-    dt = datetime.fromisoformat(iso_str)
-
-    if dt.tzinfo is None:
-        from zoneinfo import ZoneInfo
-        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-
-    # Convert to target timezone and return only time
-    return dt.astimezone(tz).time()
+    """Local wall-clock time of an ISO-8601 instant, in timezone `tz`."""
+    return parse_utc(iso_str).astimezone(tz).time()

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 
@@ -6,6 +7,12 @@ from zoneinfo import ZoneInfo
 class Region:
     region_id: int
     timezone: ZoneInfo
+
+    def now(self) -> datetime:
+        return datetime.now(self.timezone)
+
+    def today(self) -> date:
+        return self.now().date()
 
 class Area:
     def __init__(self, latitude, longtitude, id, display_name, region: Region):
