@@ -9,6 +9,7 @@ const els = {
   areaSelect: document.getElementById('area-select'),
   areaNote: document.getElementById('area-note'),
   testButton: document.getElementById('test-button'),
+  glitterToggle: document.getElementById('glitter-toggle'),
 };
 
 let registration = null;
@@ -266,6 +267,12 @@ async function unsubscribe() {
     els.button.disabled = false;
   }
 }
+
+els.glitterToggle.onclick = () => {
+  const enabled = !document.body.classList.contains('glitter-mode');
+  document.body.classList.toggle('glitter-mode', enabled);
+  els.glitterToggle.setAttribute('aria-pressed', String(enabled));
+};
 
 setUpAreas()
   .catch(() => { /* if can't load areas we don't crash the page*/ })

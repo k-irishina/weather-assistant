@@ -30,6 +30,22 @@ body {
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   /* keeps content clear of the notch when installed on iOS */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url('/icons/glitter-pink.gif') center / cover;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .4s ease;
+}
+
+body.glitter-mode::before {
+  opacity: .35;
 }
 
 main {
@@ -38,9 +54,34 @@ main {
   padding: 1.5rem 1rem 3rem;
 }
 
+header {
+  position: relative;
+  padding-right: 2.8rem;
+}
+
 h1 {
   font-size: 1.4rem;
   margin: 0;
+}
+
+.glitter-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.glitter-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 h2 {
