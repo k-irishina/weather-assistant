@@ -30,6 +30,6 @@ RIGA = Region(region_id=102, timezone=ZoneInfo("Europe/Riga"))
 areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO), 
           2: Area(59.9549, 11.0622, 2, 'Lillestrøm', OSLO),
           3: Area(56.96619506296, 24.134153506848776, 3, 'Riga - Centre', RIGA),
-          4: Area(59.9253054287, 10.711930759461595, 4, 'Oslo - Frogner', OSLO),
+          4: Area(59.8731, 10.8089, 4, 'Oslo - Lambertseter', OSLO),
           6: Area(59.960171729794176, 10.787701743038276, 6, 'Oslo - Kjelsås', OSLO)}
 
