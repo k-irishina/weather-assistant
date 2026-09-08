@@ -30,7 +30,6 @@ body {
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   /* keeps content clear of the notch when installed on iOS */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  position: relative;
 }
 
 body::before {
@@ -45,7 +44,13 @@ body::before {
 }
 
 body.glitter-mode::before {
-  opacity: .35;
+  opacity: .45;
+}
+
+body.glitter-mode .card,
+body.glitter-mode select,
+body.glitter-mode .icon-button {
+  background: color-mix(in srgb, var(--card) 80%, transparent);
 }
 
 main {
@@ -56,7 +61,7 @@ main {
 
 header {
   position: relative;
-  padding-right: 2.8rem;
+  padding-right: 5.2rem;
 }
 
 h1 {
@@ -64,24 +69,20 @@ h1 {
   margin: 0;
 }
 
-.glitter-toggle {
+.header-buttons {
   position: absolute;
   top: 0;
   right: 0;
-  width: 2.2rem;
-  height: 2.2rem;
-  padding: 0;
-  font-size: 1.1rem;
-  line-height: 1;
-  color: var(--ink);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  display: flex;
+  gap: .4rem;
 }
 
-.glitter-toggle[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
+#about ul {
+  margin: .5rem 0 0;
+}
+
+#about p {
+  margin: 0 0 .6rem;
 }
 
 h2 {
@@ -139,7 +140,24 @@ button.secondary {
   border: 1px solid var(--line);
 }
 
-ol {
+.icon-button {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+#glitter-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+ol, ul {
   padding-left: 1.2rem;
 }
 

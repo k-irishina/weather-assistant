@@ -14,11 +14,31 @@
 <body>
 <main>
   <header>
-    <button id="glitter-toggle" class="glitter-toggle" type="button"
-      aria-pressed="false" aria-label="Toggle glitter mode" title="Glitter mode">✨</button>
+    <div class="header-buttons">
+      <button id="about-toggle" class="icon-button" type="button" aria-expanded="false"
+        aria-controls="about" aria-label="About this app" title="About">?</button>
+      <button id="glitter-toggle" class="icon-button" type="button"
+        aria-pressed="false" aria-label="Toggle glitter mode" title="Glitter mode">✨</button>
+    </div>
     <h1>Weather Assistant</h1>
     <p class="place" id="place">Loading…</p>
   </header>
+
+  <section id="about" class="card" hidden>
+    <h2>What does this do?</h2>
+    <p>This page provides you with a compact and efficient forecast for the chosen location. </p>
+    <p>You no longer need to dig into the hourly forecast - this provides you with all the info you <em>actually</em> care about.</p>
+    <p>Average temp, rain, sun, wind and UV index for the day. Simple and easy.</p>
+    <p>If you turn on notifications, you will get push notifications for the chosen location:</p>
+    <ul>
+      <li><strong>Morning forecast</strong> — every day at 07:15</li>
+      <li><strong>Sunshine update</strong> — at 12:15 if the sun
+      outlook for the day has changed - so you can use it as you should 🌞</li>
+    </ul>
+    <p class="muted">*Times are GMT+2.</p>
+    <br>
+    <p>For more locations and/or any questions, contact the person who gave you the link :-P</p>
+  </section>
 
   <section id="forecast" class="card" aria-live="polite" aria-busy="true">
     <p class="muted">Fetching the forecast…</p>

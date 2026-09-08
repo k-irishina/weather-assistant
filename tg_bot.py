@@ -8,8 +8,7 @@ from functools import wraps
 from telegram import (ForceReply, InlineKeyboardButton, InlineKeyboardMarkup,
                       Update)
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
-                          ContextTypes, ConversationHandler, MessageHandler,
-                          filters)
+                          ContextTypes)
 
 import app_config
 import area
@@ -31,7 +30,7 @@ def restricted(func):
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-level=logging.DEBUG,  # Set the logging level to DEBUG
+level=logging.INFO,
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 # logging.getLogger("httpx").setLevel(logging.WARNING)

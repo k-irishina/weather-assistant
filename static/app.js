@@ -10,6 +10,8 @@ const els = {
   areaNote: document.getElementById('area-note'),
   testButton: document.getElementById('test-button'),
   glitterToggle: document.getElementById('glitter-toggle'),
+  aboutToggle: document.getElementById('about-toggle'),
+  about: document.getElementById('about'),
 };
 
 let registration = null;
@@ -272,6 +274,12 @@ els.glitterToggle.onclick = () => {
   const enabled = !document.body.classList.contains('glitter-mode');
   document.body.classList.toggle('glitter-mode', enabled);
   els.glitterToggle.setAttribute('aria-pressed', String(enabled));
+};
+
+els.aboutToggle.onclick = () => {
+  const open = els.about.hidden;
+  els.about.hidden = !open;
+  els.aboutToggle.setAttribute('aria-expanded', String(open));
 };
 
 setUpAreas()
