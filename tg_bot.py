@@ -21,8 +21,8 @@ import db_connector as db
 LIST_OF_ADMINS = app_config.users["admin-users"]
 TEST_USERS = app_config.users["test-users"]
 
-# The daily jobs run on a single shared clock: the default area's timezone.
-# Per-user send times would need one job per user, tracked separately.
+# todo: daily jobs run on the default area's timezone.
+# Per-user send times would need one job per user
 SCHEDULE_TIMEZONE = area.areas[analysis_constants.default_area_id].region.timezone
 
 def restricted(func):
@@ -45,8 +45,7 @@ level=logging.DEBUG,  # Set the logging level to DEBUG
 
 logger = logging.getLogger(__name__)
 
-# Define a few command handlers. These usually take the two arguments update and
-# context.
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
@@ -100,7 +99,6 @@ async def receive_forecast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text(text)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /help is issued."""
     await update.message.reply_text("""This bot is supposed to be your guide in following the weather forecast.
 Current functionality is still quite limited, but nice nevertheless!
 /location lets you set the location for which you would like to receive forecasts and alerts.

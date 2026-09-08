@@ -33,7 +33,9 @@ def create_data_json(response_json):
                           'ultraviolet_index_clear_sky',
                           'wind_from_direction',
                           'wind_speed',
-                          'wind_speed_of_gust']
+                          'wind_speed_of_gust',
+                          'wind_speed_percentile_10',
+                          'wind_speed_percentile_90']
         result_dic = {key:value for key, value in instant_data.items() if key in details_fields}
         result_dic['forecast_time'] = time['time']
     

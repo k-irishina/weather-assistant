@@ -31,6 +31,13 @@ def local_day_bounds(area: area.Area, target_date: date) -> tuple[datetime, date
     return start, end
 
 
+class WindReading(NamedTuple):
+    speed: Optional[float]
+    gust: Optional[float]
+    percentile_10: Optional[float]
+    percentile_90: Optional[float]
+
+
 class ForecastFetch(NamedTuple):
     last_modified: datetime
     expire_time: datetime
@@ -255,15 +262,18 @@ def evaluate_precipitation(area: area.Area, date: date) -> dict[time, float]:
     return precip_results
 
 
-def evaluate_wind(area: area.Area, date: date):
+def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:
     timezone = str(area.region.timezone)
     day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
-            # wind_speed is m/s
             query = """
                 WITH latest_data AS (
-                    SELECT forecast_time, forecast_data->>'wind_speed' AS wind_speed
+                    SELECT forecast_time,
+                           forecast_data->>'wind_speed' AS wind_speed,
+                           forecast_data->>'wind_speed_of_gust' AS gust,
+                           forecast_data->>'wind_speed_percentile_10' AS p10,
+                           forecast_data->>'wind_speed_percentile_90' AS p90
                     FROM forecast_complete
                     WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
                       AND area = %(area)s
@@ -275,9 +285,9 @@ def evaluate_wind(area: area.Area, date: date):
                           GROUP BY forecast_time
                       )
                 )
-                SELECT (forecast_time AT TIME ZONE %(tz)s)::time, wind_speed::numeric
+                SELECT (forecast_time AT TIME ZONE %(tz)s)::time,
+                       wind_speed::numeric, gust::numeric, p10::numeric, p90::numeric
                 FROM latest_data
-                WHERE wind_speed::numeric > %(min_wind_speed)s
                 ORDER BY forecast_time;
             """
             cursor.execute(
@@ -287,14 +297,12 @@ def evaluate_wind(area: area.Area, date: date):
                     "day_start": day_start,
                     "day_end": day_end,
                     "area": area.id,
-                    "min_wind_speed": analysis_constants.min_wind_speed,  # m/s
                 },
             )
-            results = cursor.fetchall()
-
-            wind_results = {row[0]: row[1] for row in results}
-
-    return wind_results
+            return {
+                hour: WindReading(speed=speed, gust=gust, percentile_10=p10, percentile_90=p90)
+                for hour, speed, gust, p10, p90 in cursor.fetchall()
+            }
 
 
 def highest_uv_index(area: area.Area, date: date):
@@ -469,3 +477,51 @@ def dynamic_update_users() -> list:
             for res in result:
                 result_list.append(res[0])
             return result_list
+
+
+class WebSubscription(NamedTuple):
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+def save_web_subscription(endpoint: str, p256dh: str, auth: str, area: area.Area):
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO web_subscriptions(endpoint, p256dh, auth, area, last_seen)
+                VALUES(%s, %s, %s, %s, now())
+                ON CONFLICT (endpoint) DO UPDATE SET
+                    p256dh = EXCLUDED.p256dh,
+                    auth = EXCLUDED.auth,
+                    area = EXCLUDED.area,
+                    last_seen = now();
+                """,
+                (endpoint, p256dh, auth, area.id),
+            )
+            conn.commit()
+
+
+def web_subscriptions_for_area(area: area.Area) -> list[WebSubscription]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT endpoint, p256dh, auth
+                FROM web_subscriptions
+                WHERE area = %s
+                """,
+                (area.id,),
+            )
+            return [WebSubscription(*row) for row in cur.fetchall()]
+
+
+def delete_web_subscription(endpoint: str) -> None:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """DELETE FROM web_subscriptions WHERE endpoint = %s""",
+                (endpoint,),
+            )
+            conn.commit()

@@ -123,6 +123,10 @@ def fetch_forecast_for_user(user_id):
 def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
     area_id = db.fetch_user_location(user_id)
     user_area = area.areas.get(area_id, area.areas[constants.default_area_id])
+    return fetch_sunset_sunrise_for_area(user_area)
+
+
+def fetch_sunset_sunrise_for_area(user_area: area.Area) -> db.SunriseTimes:
     date_today = user_area.region.today()
         # we don't require high accuracy here, so 10 days is acceptable
     sunrise_sunset_stored = db.fetch_sunrise_sunset(user_area, date_today, 10)
@@ -157,5 +161,5 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
             }
 
 def time_of_timezone(iso_str: str, tz: ZoneInfo) -> time:
-    """Local wall-clock time of an ISO-8601 instant, in timezone `tz`."""
+    """Local time of an ISO-8601 instant, in timezone tz"""
     return parse_utc(iso_str).astimezone(tz).time()

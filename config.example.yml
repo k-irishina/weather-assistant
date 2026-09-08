@@ -15,6 +15,13 @@ met-api:
 users:
   test-users: [111111, 22222]
   admin-users: [111111, 22222]
+web:
+  host: '0.0.0.0'
+  port: 8000
+  vapid:
+    public-key: 'base64url-encoded public key'
+    private-key: 'base64url-encoded private key'
+    contact: 'mailto:you@example.com'
 data:
   # Leave unset (or null) to keep every file, which is the default.
   retention-days: null

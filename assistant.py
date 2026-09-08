@@ -1,8 +1,8 @@
 import logging as log
 import random
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from statistics import mean
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 import analysis_constants as constants
 import area
@@ -10,12 +10,31 @@ import db_connector
 import retrieve_complete_forecast as rcf
 
 
-def morning_forecast(user_id):
-    # this needs to fetch fresh data
-    area_id = db_connector.fetch_user_location(user_id)
-    area_obj = area.areas.get(area_id, area.areas[constants.default_area_id])
+class Precipitation(TypedDict):
+    name: str
+    emoji_active: str
+    emoji_inactive: str
 
-    rcf.fetch_forecast_for_area_id(area_id)
+
+class ForecastReport(TypedDict):
+    area_id: int
+    area_name: str
+    forecast_day: date
+    local_now: datetime
+    # none when the report is for the next day
+    from_hour: Optional[time]
+    temperatures: dict
+    uv_index: float
+    sunrise_sunset: db_connector.SunriseTimes
+    sunny_times: dict[time, float]
+    precipitation: Precipitation
+    precipitation_high: list[time]
+    precipitation_possible: list[time]
+    wind_by_hour: dict[time, db_connector.WindReading]
+
+
+def forecast_for_area(area_obj: area.Area) -> ForecastReport:
+    rcf.fetch_forecast_for_area_id(area_obj.id)
 
     # if later in the day, provide tomorrow's forecast
     local_now = area_obj.region.now()
@@ -26,7 +45,7 @@ def morning_forecast(user_id):
 
     # analysed values
     avg_temperatures = db_connector.select_related_temperatures(area_obj, forecast_day)
-    sunrise_sunset = rcf.fetch_sunset_sunrise(user_id)
+    sunrise_sunset = rcf.fetch_sunset_sunrise_for_area(area_obj)
     sunny_times = db_connector.evaluate_clouds(
         area_obj,
         forecast_day,
@@ -37,7 +56,12 @@ def morning_forecast(user_id):
         area_obj, forecast_day
     )
     uv_index = db_connector.highest_uv_index(area_obj, forecast_day)
-    precipitation = precipitation_type(avg_temperatures)
+    wind_by_hour = db_connector.evaluate_wind(area_obj, forecast_day)
+
+    from_hour = current_hour_cutoff(local_now, forecast_day)
+    sunny_times = from_hour_onwards(sunny_times, from_hour)
+    precipitation_pct_by_hour = from_hour_onwards(precipitation_pct_by_hour, from_hour)
+    wind_by_hour = from_hour_onwards(wind_by_hour, from_hour)
 
     highprcpt = []
     potentialprcpt = []
@@ -48,26 +72,120 @@ def morning_forecast(user_id):
         else:
             potentialprcpt.append(hour)
 
+    return ForecastReport(
+        area_id=area_obj.id,
+        area_name=area_obj.display_name,
+        forecast_day=forecast_day,
+        local_now=local_now,
+        from_hour=from_hour,
+        temperatures=avg_temperatures,
+        uv_index=uv_index,
+        sunrise_sunset=sunrise_sunset,
+        sunny_times=sunny_times,
+        precipitation=precipitation_type(avg_temperatures),
+        precipitation_high=highprcpt,
+        precipitation_possible=potentialprcpt,
+        wind_by_hour=wind_by_hour,
+    )
+
+
+def format_forecast_text(report: ForecastReport) -> str:
     # Day of week name, numeric day of month, month name
-    day_text = forecast_day.strftime('%A %d %B')
+    day_text = report["forecast_day"].strftime('%A %-d %B')
 
-    # todo: add wind/wind gusts
+    return f"""
+{get_greeting(report["local_now"].hour)}
 
-    text = f"""
-{get_greeting(local_now.hour)}
+Forecast for {day_text}, {report["area_name"]}:
 
-Forecast for {day_text}, {area_obj.display_name}:
+{compose_temperature_text(report["temperatures"], report["from_hour"])}
 
-Morning: {format_temperature(avg_temperatures['morning']['avg_temperature'])}
-Afternoon: {format_temperature(avg_temperatures['midday']['avg_temperature'])}
-Evening: {format_temperature(avg_temperatures['evening']['avg_temperature'])}
+Max UV index: {round(report["uv_index"])}
 
-Max UV index: {round(uv_index)}
-
-{compose_sunny_text(sunny_times)}
-{compose_precipitation_text(highprcpt, potentialprcpt, precipitation)}
+{compose_sunny_text(report["sunny_times"])}
+{compose_precipitation_text(report["precipitation_high"], report["precipitation_possible"], report["precipitation"])}
+{compose_wind_text(report["wind_by_hour"])}
 """
-    return text
+
+
+def morning_forecast(user_id):
+    area_id = db_connector.fetch_user_location(user_id)
+    area_obj = area.areas.get(area_id, area.areas[constants.default_area_id])
+    return format_forecast_text(forecast_for_area(area_obj))
+
+# boundaries of when period is shown in the forecast
+temperature_periods = (
+    ("Morning", "morning", time(12)),
+    ("Afternoon", "midday", time(18)),
+    ("Evening", "evening", time(23)),
+)
+
+def compose_temperature_text(avg_temperatures: dict, cutoff: Optional[time]) -> str:
+    return "\n".join(
+        f"{label}: {format_temperature(avg_temperatures[key]['avg_temperature'])}"
+        for label, key, until in temperature_periods
+        if cutoff is None or until > cutoff
+    )
+
+
+def current_hour_cutoff(local_now: datetime, forecast_day) -> Optional[time]:
+    if forecast_day != local_now.date():
+        return None
+    return local_now.time().replace(minute=0, second=0, microsecond=0)
+
+
+def from_hour_onwards(by_hour: dict, cutoff: Optional[time]) -> dict:
+    if cutoff is None:
+        return by_hour
+    return {hour: value for hour, value in by_hour.items() if hour >= cutoff}
+
+
+def compose_wind_text(wind_by_hour: dict) -> str:
+    strong, moderate = [], []
+    for hour, reading in sorted(wind_by_hour.items()):
+        strength = constants.wind_strength(
+            reading.speed, reading.gust, reading.percentile_90
+        )
+        if strength == constants.STRONG:
+            strong.append(hour)
+        elif strength == constants.MODERATE:
+            moderate.append(hour)
+
+    if not strong and not moderate:
+        return ""
+
+    speeds = [r.speed for r in wind_by_hour.values() if r.speed is not None]
+    gusts = [r.gust for r in wind_by_hour.values() if r.gust is not None]
+    peak = f"up to {max(speeds):g} m/s" if speeds else ""
+    if gusts:
+        peak += f", gusts {max(gusts):g} m/s"
+
+    text = ""
+    if strong:
+        text += f'🌬️ Strong wind at {format_hours(strong)}.\n'
+    if moderate:
+        text += f'💨 Moderate wind at {format_hours(moderate)}.\n'
+    return text + f"Peak {peak}." if peak else text.rstrip()
+
+
+def format_hours(hours) -> str:
+    if not hours:
+        return ""
+    runs = [[hours[0], hours[0]]]
+    for hour in hours[1:]:
+        if hour.hour == runs[-1][1].hour + 1:
+            runs[-1][1] = hour
+        else:
+            runs.append([hour, hour])
+    return ", ".join(
+        format_hour(start) if start == end
+        else f"{format_hour(start)}-{format_hour(end)}"
+        for start, end in runs
+    )
+
+
+def format_hour(hour) -> str:
+    return hour.strftime("%I %p").lstrip("0")
 
 def format_temperature(value) -> str:
     return "no data" if value is None else f"{value} °C"
@@ -75,9 +193,9 @@ def format_temperature(value) -> str:
 def compose_precipitation_text(highprcpt, potentialprcpt, precipitation):
     text = ''
     if highprcpt:
-        text += f'High potential for {precipitation["name"]} at {", ".join(hour.strftime("%I %p") for hour in highprcpt)} {precipitation["emoji_active"]}\n'
+        text += f'High potential for {precipitation["name"]} at {format_hours(sorted(highprcpt))} {precipitation["emoji_active"]}\n'
     if potentialprcpt:
-        text += f'Possible {precipitation["name"]} at {", ".join(hour.strftime("%I %p") for hour in potentialprcpt)}.\n'
+        text += f'Possible {precipitation["name"]} at {format_hours(sorted(potentialprcpt))}.\n'
     if not highprcpt and not potentialprcpt:
         text += f'No {precipitation["name"]} in sight! {precipitation["emoji_inactive"]}\n'
     return text
@@ -117,6 +235,8 @@ def get_greeting(current_hour: int = None):
                 "Shouldn't you be asleep? 🤨",
                 "😪",
                 "🦉",
+                "Still up?",
+                "It's way past <b>my</b> bedtime!"
                 "It's a bit late, but sure...",
             ],
         ),
@@ -166,7 +286,7 @@ def detect_sun_change(user_id):
         log.info('No hours turned sunny between the two forecasts')
         return None
 
-    hours = ", ".join(entry.strftime("%I %p") for entry in sorted(now_sunny_at))
+    hours = ", ".join(format_hour(entry) for entry in sorted(now_sunny_at))
     return f"""
 Two forecasts were compared: {previous_forecast_at} and {latest_forecast_at}.
 It is now going to be sunnier at {hours}
@@ -204,7 +324,7 @@ def compose_sunny_text(sunny_times: dict[time, float]) -> str:
         # current_sunny_times = filter(lambda sun_time : datetime.now().time() < sun_time, sunny_times.keys())
         current_sunny_times = sunny_times.keys()
         if current_sunny_times:
-            return f'🌞 Expect sun at {", ".join([key.strftime("%I %p") for key in sunny_times.keys()])}'
+            return f'🌞 Expect sun at {format_hours(sorted(sunny_times))}'
         else:
             return "No more expected sunny times today. ☁"
 
@@ -215,12 +335,6 @@ def calculate_if_sunny(json_data) -> bool:
         json_data.get('cloud_area_fraction_low'),
         json_data.get('cloud_area_fraction_medium'),
     )
-
-class Precipitation(TypedDict):
-    name: str
-    emoji_active: str
-    emoji_inactive: str
-
 
 def precipitation_type(avg_temps: dict[str, dict[str, float]]) -> Precipitation:
     avg_temp = [

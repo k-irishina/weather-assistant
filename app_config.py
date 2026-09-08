@@ -23,5 +23,7 @@ telegram = config["telegram"]
 met_api = config["met-api"]
 users = config["users"]
 
+web = config.get("web") or {}
+
 # todo: prune JSON responses in data/ older than this many days.
 data_retention_days = (config.get("data") or {}).get("retention-days")

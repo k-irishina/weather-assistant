@@ -30,3 +30,12 @@ CREATE INDEX region_id_for_date ON sunrise(for_date, region_id);
 CREATE INDEX idx_forecast_update_log_area ON forecast_update_log(area);
 
 CREATE INDEX idx_forecast_complete_area_time ON forecast_complete(area, forecast_time);
+
+CREATE TABLE web_subscriptions(
+             id SERIAL PRIMARY KEY,
+             endpoint text UNIQUE NOT NULL,
+             p256dh text NOT NULL,
+             auth text NOT NULL,
+             area integer NOT NULL DEFAULT 1,
+             created_at timestamptz NOT NULL DEFAULT now(),
+             last_seen timestamptz);
