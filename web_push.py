@@ -6,7 +6,6 @@ from typing import Optional
 
 from pywebpush import WebPushException, webpush
 
-import analysis_constants
 import app_config
 import area
 import assistant
@@ -93,9 +92,11 @@ def send_to_area(area_obj: area.Area, title: str, body: str, tag: Optional[str] 
 
 
 def subscribed_areas() -> list[area.Area]:
-    """Areas browsers can be subscribed to. Only the default one until the
-    page can pick a location."""
-    return [area.areas[analysis_constants.default_area_id]]
+    return [
+        area.areas[area_id]
+        for area_id in db.areas_with_web_subscribers()
+        if area_id in area.areas
+    ]
 
 
 async def push_morning_forecast() -> None:

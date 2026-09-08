@@ -7,6 +7,7 @@
   --accent: #1b2a41;
   --sun: #f5b301;
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #141b26;
@@ -18,23 +19,46 @@
   }
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   /* keeps content clear of the notch when installed on iOS */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
-           env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-main { max-width: 34rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 
-h1 { font-size: 1.4rem; margin: 0; }
-h2 { font-size: 1rem; margin: 0 0 .5rem; text-transform: uppercase;
-     letter-spacing: .06em; color: var(--muted); }
-.place { margin: .25rem 0 1.25rem; color: var(--muted); }
-.muted { color: var(--muted); }
+main {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 .5rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.place {
+  margin: .25rem 0 1.25rem;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
 
 .card {
   background: var(--card);
@@ -62,14 +86,63 @@ button {
   cursor: pointer;
   width: 100%;
 }
-button:disabled { opacity: .55; cursor: default; }
+
+button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
 button.secondary {
   background: transparent;
   color: var(--muted);
   border: 1px solid var(--line);
 }
 
-ol { padding-left: 1.2rem; }
-li { margin: .3rem 0; }
-a { color: inherit; }
-footer { margin-top: 2rem; font-size: .85rem; text-align: center; }
+ol {
+  padding-left: 1.2rem;
+}
+
+li {
+  margin: .3rem 0;
+}
+
+a {
+  color: inherit;
+}
+
+footer {
+  margin-top: 2rem;
+  font-size: .85rem;
+  text-align: center;
+}
+
+select {
+  font: inherit;
+  width: 100%;
+  padding: .6rem .7rem;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: .5rem;
+}
+
+#area-note {
+  margin: .6rem 0 0;
+  font-size: .85rem;
+}
+
+#area-note:empty {
+  display: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

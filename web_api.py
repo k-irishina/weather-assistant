@@ -21,8 +21,16 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-# todo: make users select an area
 DEFAULT_AREA = area.areas[constants.default_area_id]
+
+
+def resolve_area(area_id: Optional[int]) -> area.Area:
+    if area_id is None:
+        return DEFAULT_AREA
+    chosen = area.areas.get(area_id)
+    if chosen is None:
+        raise HTTPException(status_code=400, detail=f"Unknown area {area_id}.")
+    return chosen
 
 
 class SubscriptionKeys(BaseModel):
@@ -33,6 +41,12 @@ class SubscriptionKeys(BaseModel):
 class Subscription(BaseModel):
     endpoint: str = Field(min_length=1)
     keys: SubscriptionKeys
+    area: Optional[int] = None
+
+
+class AreaChange(BaseModel):
+    endpoint: str = Field(min_length=1)
+    area: int
 
 
 class Unsubscribe(BaseModel):
@@ -93,8 +107,19 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
 
 
 @router.get("/forecast")
-def get_forecast() -> dict:
-    return forecast_payload(assistant.forecast_for_area(DEFAULT_AREA))
+def get_forecast(area: Optional[int] = None) -> dict:
+    return forecast_payload(assistant.forecast_for_area(resolve_area(area)))
+
+
+@router.get("/areas")
+def get_areas() -> dict:
+    return {
+        "default": DEFAULT_AREA.id,
+        "areas": [
+            {"id": area_obj.id, "name": area_obj.display_name}
+            for area_obj in sorted(area.areas.values(), key=lambda a: a.display_name)
+        ],
+    }
 
 
 @router.get("/vapid-key")
@@ -111,14 +136,24 @@ def get_vapid_key() -> dict:
 
 @router.post("/subscribe", status_code=201)
 def subscribe(subscription: Subscription) -> dict:
+    chosen = resolve_area(subscription.area)
     db.save_web_subscription(
         subscription.endpoint,
         subscription.keys.p256dh,
         subscription.keys.auth,
-        DEFAULT_AREA,
+        chosen,
     )
-    log.info("Stored web push subscription for %s", DEFAULT_AREA.display_name)
-    return {"status": "subscribed", "area": DEFAULT_AREA.display_name}
+    log.info("Stored web push subscription for %s", chosen.display_name)
+    return {"status": "subscribed", "area": chosen.id, "area_name": chosen.display_name}
+
+
+@router.post("/area")
+def change_area(body: AreaChange) -> dict:
+    chosen = resolve_area(body.area)
+    if not db.update_web_subscription_area(body.endpoint, chosen):
+        raise HTTPException(status_code=404, detail="No such subscription.")
+    log.info("Web subscription moved to %s", chosen.display_name)
+    return {"status": "updated", "area": chosen.id, "area_name": chosen.display_name}
 
 
 @router.post("/unsubscribe")
@@ -135,6 +170,7 @@ def whoami(body: Unsubscribe) -> dict:
     return {
         "known": subscription is not None,
         "is_admin": bool(subscription and subscription.is_admin),
+        "area": subscription.area if subscription else None,
     }
 
 

@@ -13,6 +13,13 @@ import web_api
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+
+class RevalidatingStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=app_config.log_level,
@@ -44,7 +51,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Weather Assistant", lifespan=lifespan)
 app.include_router(web_api.router)
 
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+app.mount("/", RevalidatingStaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 
 if __name__ == "__main__":

@@ -488,6 +488,7 @@ class WebSubscription(NamedTuple):
     p256dh: str
     auth: str
     is_admin: bool = False
+    area: Optional[int] = None
 
 
 def save_web_subscription(endpoint: str, p256dh: str, auth: str, area: area.Area):
@@ -527,7 +528,7 @@ def find_web_subscription(endpoint: str) -> Optional[WebSubscription]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT endpoint, p256dh, auth, is_admin
+                SELECT endpoint, p256dh, auth, is_admin, area
                 FROM web_subscriptions
                 WHERE endpoint = %s
                 """,
@@ -545,3 +546,28 @@ def delete_web_subscription(endpoint: str) -> None:
                 (endpoint,),
             )
             conn.commit()
+
+
+def update_web_subscription_area(endpoint: str, area: area.Area) -> bool:
+    """Point a browser's subscription at a different area. False if unknown."""
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE web_subscriptions
+                SET area = %s, last_seen = now()
+                WHERE endpoint = %s
+                """,
+                (area.id, endpoint),
+            )
+            updated = cur.rowcount
+        conn.commit()
+    return updated > 0
+
+
+def areas_with_web_subscribers() -> list[int]:
+    # we only care for areas that have people subscribed
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT area FROM web_subscriptions")
+            return [row[0] for row in cur.fetchall()]

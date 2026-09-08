@@ -6,14 +6,84 @@ const els = {
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
   iosHelp: document.getElementById('ios-help'),
+  areaSelect: document.getElementById('area-select'),
+  areaNote: document.getElementById('area-note'),
   testButton: document.getElementById('test-button'),
 };
 
 let registration = null;
+let selectedArea = null;
+
+// if not subscribed, enables us to keep users location in browser
+const AREA_KEY = 'weather-assistant-area';
+
+function rememberedArea() {
+  try {
+    const stored = localStorage.getItem(AREA_KEY);
+    return stored === null ? null : Number(stored);
+  } catch (err) {
+    return null;
+  }
+}
+
+function rememberArea(areaId) {
+  try {
+    localStorage.setItem(AREA_KEY, String(areaId));
+  } catch (err) {
+  }
+}
+
+async function setUpAreas() {
+  const res = await fetch('/api/areas');
+  if (!res.ok) return;
+  const { areas, default: defaultArea } = await res.json();
+
+  const remembered = rememberedArea();
+  selectedArea = remembered === null ? defaultArea : remembered;
+  if (!areas.some((a) => a.id === selectedArea)) selectedArea = defaultArea;
+
+  els.areaSelect.replaceChildren(
+    ...areas.map((a) => {
+      const option = document.createElement('option');
+      option.value = a.id;
+      option.textContent = a.name;
+      option.selected = a.id === selectedArea;
+      return option;
+    })
+  );
+  els.areaSelect.onchange = () => changeArea(Number(els.areaSelect.value));
+}
+
+async function changeArea(areaId) {
+  selectedArea = areaId;
+  rememberArea(areaId);
+  els.areaNote.textContent = '';
+  await loadForecast();
+
+  if (!registration) return;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return;
+
+  try {
+    const res = await fetch('/api/area', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint, area: areaId }),
+    });
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+    const { area_name: areaName } = await res.json();
+    els.areaNote.textContent = `Notifications now follow ${areaName}.`;
+  } catch (err) {
+    els.areaNote.textContent = `Could not move your notifications: ${err.message}`;
+  }
+}
 
 async function loadForecast() {
   try {
-    const res = await fetch('/api/forecast');
+    const url = selectedArea === null
+      ? '/api/forecast'
+      : `/api/forecast?area=${selectedArea}`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
 
@@ -167,7 +237,7 @@ async function subscribe() {
     const res = await fetch('/api/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription),
+      body: JSON.stringify({ ...subscription.toJSON(), area: selectedArea }),
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
 
@@ -197,5 +267,7 @@ async function unsubscribe() {
   }
 }
 
-loadForecast();
-setUpPush();
+setUpAreas()
+  .catch(() => { /* if can't load areas we don't crash the page*/ })
+  .then(loadForecast)
+  .then(setUpPush);
