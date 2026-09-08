@@ -1,0 +1,75 @@
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --ink: #1b2a41;
+  --muted: #5c6b80;
+  --line: #dde3ea;
+  --accent: #1b2a41;
+  --sun: #f5b301;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141b26;
+    --card: #1d2735;
+    --ink: #e8edf4;
+    --muted: #94a3b8;
+    --line: #2b3849;
+    --accent: #f5b301;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* keeps content clear of the notch when installed on iOS */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+main { max-width: 34rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+h1 { font-size: 1.4rem; margin: 0; }
+h2 { font-size: 1rem; margin: 0 0 .5rem; text-transform: uppercase;
+     letter-spacing: .06em; color: var(--muted); }
+.place { margin: .25rem 0 1.25rem; color: var(--muted); }
+.muted { color: var(--muted); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+#forecast pre {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: .5rem;
+  padding: .7rem 1.1rem;
+  cursor: pointer;
+  width: 100%;
+}
+button:disabled { opacity: .55; cursor: default; }
+button.secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+ol { padding-left: 1.2rem; }
+li { margin: .3rem 0; }
+a { color: inherit; }
+footer { margin-top: 2rem; font-size: .85rem; text-align: center; }

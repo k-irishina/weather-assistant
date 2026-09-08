@@ -11,13 +11,17 @@ import app_config
 database_config = app_config.database
 pool_config = database_config["pool"]
 
-strconn = make_conninfo(
-    dbname=database_config["name"],
-    user=database_config["user"],
-    host=database_config["host"],
-    password=database_config["password"],
-    port=database_config["port"],
-)
+
+if database_config.get("url"):
+    strconn = make_conninfo(database_config["url"])
+else:
+    strconn = make_conninfo(
+        dbname=database_config["name"],
+        user=database_config["user"],
+        host=database_config["host"],
+        password=database_config["password"],
+        port=database_config["port"],
+    )
 
 connpool = psycopg_pool.ConnectionPool(
     conninfo=strconn, timeout=pool_config["timeout"], max_size=pool_config["max_size"]

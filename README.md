@@ -19,14 +19,9 @@ Message @WhisperWeatherBot on Telegram and use /help to get available commands a
 
 ### Tech
 
-The app is written in Python. User interaction and notifications are currently provided through a Telegram bot, with plans to eventually create a standalone application, but the current focus is accurate data analysis. Database used is PostgreSQL.
+The app is written in Python. User interaction and notifications are currently provided through a Telegram bot, with plans to eventually create a standalone application. Database used is PostgreSQL.
 
 All forecast data is kindly provided by [MET Weather API](https://api.met.no/)
 
 #### TODOs
-* Fix timezone inaccuracy
-* Introduce tests
-* Store all forecast data in one INSERT statement
-* Better determination of sunny conditions
-* Remove pytz
-* Logging, not printing
+You can find upcoming changes and improvements in the [Issues tab](https://github.com/k-irishina/weather-assistant/issues)

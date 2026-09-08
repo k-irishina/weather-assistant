@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Weather Assistant</title>
+<meta name="theme-color" content="#1b2a41">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Weather">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Weather Assistant</h1>
+    <p class="place" id="place">Loading…</p>
+  </header>
+
+  <section id="forecast" class="card" aria-live="polite" aria-busy="true">
+    <p class="muted">Fetching the forecast…</p>
+  </section>
+
+  <section class="card">
+    <h2>Notifications</h2>
+    <p class="muted" id="push-status">Checking…</p>
+    <button id="push-button" hidden></button>
+    <div id="ios-help" hidden>
+      <p>On iPhone and iPad, notifications only work once this page is on your
+      Home Screen:</p>
+      <ol>
+        <li>Tap the <strong>Share</strong> button below</li>
+        <li>Choose <strong>Add to Home Screen</strong></li>
+        <li>Open it from the new icon, then come back here</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>
+    <p class="muted">Forecast data from
+      <a href="https://api.met.no/">MET Norway</a>. On Telegram as
+      @WhisperWeatherBot.</p>
+  </footer>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

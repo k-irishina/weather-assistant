@@ -89,12 +89,14 @@ def forecast_for_area(area_obj: area.Area) -> ForecastReport:
     )
 
 
-def format_forecast_text(report: ForecastReport) -> str:
+def format_forecast_text(report: ForecastReport, greeting: Optional[str] = None) -> str:
     # Day of week name, numeric day of month, month name
     day_text = report["forecast_day"].strftime('%A %-d %B')
+    if greeting is None:
+        greeting = get_greeting(report["local_now"].hour)
 
     return f"""
-{get_greeting(report["local_now"].hour)}
+{greeting}
 
 Forecast for {day_text}, {report["area_name"]}:
 

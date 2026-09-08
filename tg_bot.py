@@ -156,8 +156,17 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-def main() -> None:
-    """Starting weather assistant..."""
+# arguments for the polling for both standalone bot and web app
+POLLING_KWARGS = dict(
+    allowed_updates=Update.ALL_TYPES,
+    poll_interval=5.0,
+    read_timeout=20.0,
+    connect_timeout=20.0,
+    write_timeout=20.0,
+)
+
+
+def build_application() -> Application:
     token = app_config.telegram['token']
     application = Application.builder().token(token).build()
 
@@ -174,7 +183,11 @@ def main() -> None:
     schedule_sun_update(application)
     schedule_morning_forecast(application)
 
-    application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=5.0, read_timeout= 20.0, connect_timeout=20.0, write_timeout=20.0)
+    return application
+
+
+def main() -> None:
+    build_application().run_polling(**POLLING_KWARGS)
 
 if __name__ == "__main__":
     main()
