@@ -15,6 +15,7 @@ import app_config
 import area
 import assistant
 import db_connector as db
+import web_push
 
 log = logging.getLogger(__name__)
 
@@ -125,3 +126,34 @@ def unsubscribe(body: Unsubscribe) -> dict:
     db.delete_web_subscription(body.endpoint)
     log.info("Removed a web push subscription")
     return {"status": "unsubscribed"}
+
+
+@router.post("/me")
+def whoami(body: Unsubscribe) -> dict:
+    # enables the test push button
+    subscription = db.find_web_subscription(body.endpoint)
+    return {
+        "known": subscription is not None,
+        "is_admin": bool(subscription and subscription.is_admin),
+    }
+
+
+@router.post("/test-push")
+def test_push(body: Unsubscribe) -> dict:
+    # test push to debug
+    subscription = db.find_web_subscription(body.endpoint)
+    if subscription is None or not subscription.is_admin:
+        raise HTTPException(status_code=403, detail="Not a test device.")
+
+    delivered = web_push.send_to_subscription(
+        subscription,
+        "Test notification",
+        "If you can read this, push works. ☆*: .｡. o(≧▽≦)o .｡.:*☆",
+        tag="test",
+    )
+    if not delivered:
+        raise HTTPException(
+            status_code=502,
+            detail="push rejected by service",
+        )
+    return {"status": "sent"}

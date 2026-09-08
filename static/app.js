@@ -1,4 +1,4 @@
-const PUSH_ENABLED = false;
+const PUSH_ENABLED = true;
 
 const els = {
   place: document.getElementById('place'),
@@ -6,6 +6,7 @@ const els = {
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
   iosHelp: document.getElementById('ios-help'),
+  testButton: document.getElementById('test-button'),
 };
 
 let registration = null;
@@ -86,11 +87,59 @@ async function setUpPush() {
 function showSubscribed() {
   els.status.textContent = 'On — you will get the morning forecast and sun updates.';
   setButton('Turn off notifications', unsubscribe, true);
+  showTestButton();
 }
 
 function showUnsubscribed() {
   els.status.textContent = 'Off — turn them on for a morning forecast and sun updates.';
   setButton('Enable notifications', subscribe);
+  els.testButton.hidden = true;
+}
+
+async function showTestButton() {
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return;
+
+    const res = await fetch('/api/me', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
+    });
+    if (!res.ok) return;
+
+    const { is_admin: isAdmin } = await res.json();
+    if (!isAdmin) return;
+
+    els.testButton.hidden = false;
+    els.testButton.disabled = false;
+    els.testButton.textContent = 'Send a test notification';
+    els.testButton.onclick = sendTestPush;
+  } catch (err) {
+    console.warn('Could not check test-device status:', err);
+  }
+}
+
+async function sendTestPush() {
+  els.testButton.disabled = true;
+  els.testButton.textContent = 'Sending…';
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    const res = await fetch('/api/test-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
+    });
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+    els.testButton.textContent = 'Sent';
+  } catch (err) {
+    els.testButton.textContent = `Failed: ${err.message}`;
+  } finally {
+    setTimeout(() => {
+      els.testButton.disabled = false;
+      els.testButton.textContent = 'Send a test notification';
+    }, 4000);
+  }
 }
 
 async function subscribe() {

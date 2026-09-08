@@ -487,6 +487,7 @@ class WebSubscription(NamedTuple):
     endpoint: str
     p256dh: str
     auth: str
+    is_admin: bool = False
 
 
 def save_web_subscription(endpoint: str, p256dh: str, auth: str, area: area.Area):
@@ -512,13 +513,28 @@ def web_subscriptions_for_area(area: area.Area) -> list[WebSubscription]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT endpoint, p256dh, auth
+                SELECT endpoint, p256dh, auth, is_admin
                 FROM web_subscriptions
                 WHERE area = %s
                 """,
                 (area.id,),
             )
             return [WebSubscription(*row) for row in cur.fetchall()]
+
+
+def find_web_subscription(endpoint: str) -> Optional[WebSubscription]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT endpoint, p256dh, auth, is_admin
+                FROM web_subscriptions
+                WHERE endpoint = %s
+                """,
+                (endpoint,),
+            )
+            row = cur.fetchone()
+            return WebSubscription(*row) if row else None
 
 
 def delete_web_subscription(endpoint: str) -> None:

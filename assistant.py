@@ -254,7 +254,10 @@ def get_greeting(current_hour: int = None):
 
 def detect_sun_change(user_id):
     int_location = db_connector.fetch_user_location(user_id)
-    select_area = area.areas[int_location]
+    return detect_sun_change_for_area(area.areas[int_location])
+
+
+def detect_sun_change_for_area(select_area: area.Area):
     # get previous forecast (time fetched < 10AM local time of the day)
     hours_since_cutoff = select_area.region.now().hour - time(hour=10, minute=0).hour
 

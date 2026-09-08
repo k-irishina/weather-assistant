@@ -38,4 +38,5 @@ CREATE TABLE web_subscriptions(
              auth text NOT NULL,
              area integer NOT NULL DEFAULT 1,
              created_at timestamptz NOT NULL DEFAULT now(),
-             last_seen timestamptz);
+             last_seen timestamptz,
+             is_admin boolean NOT NULL DEFAULT false);

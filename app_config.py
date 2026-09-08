@@ -69,11 +69,9 @@ data_retention_days = os.environ.get("DATA_RETENTION_DAYS") or (
 if data_retention_days is not None:
     data_retention_days = int(data_retention_days)
 
-# should set INFO on env
 log_level = (os.environ.get("LOG_LEVEL") or config.get("log-level") or "DEBUG").upper()
 
-
-def missing_settings() -> list[str]:
+def _missing_settings() -> list[str]:
     missing = []
     if not (database.get("url") or database.get("name")):
         missing.append("database (config.yml database:, or DATABASE_URL)")
@@ -82,3 +80,9 @@ def missing_settings() -> list[str]:
     if not met_api.get("user-agent-header"):
         missing.append("MET user agent (config.yml met-api, or MET_USER_AGENT)")
     return missing
+
+_missing = _missing_settings()
+if _missing:
+    raise RuntimeError(
+        "Missing required configuration:\n  - " + "\n  - ".join(_missing)
+    )

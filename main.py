@@ -20,17 +20,8 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def check_config() -> None:
-    missing = app_config.missing_settings()
-    if missing:
-        raise RuntimeError(
-            "Missing required config:\n  - " + "\n  - ".join(missing)
-        )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    check_config()
     bot = tg_bot.build_application()
 
     # Same order as Application.run_polling: initialize, poll, then start the
