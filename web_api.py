@@ -15,6 +15,7 @@ import app_config
 import area
 import assistant
 import db_connector as db
+import near_term_forecast
 import web_push
 
 log = logging.getLogger(__name__)
@@ -47,6 +48,11 @@ class Subscription(BaseModel):
 class AreaChange(BaseModel):
     endpoint: str = Field(min_length=1)
     area: int
+
+
+class RainAlertChange(BaseModel):
+    endpoint: str = Field(min_length=1)
+    enabled: bool
 
 
 class Unsubscribe(BaseModel):
@@ -118,6 +124,14 @@ def get_forecast(area: Optional[int] = None) -> dict:
     return forecast_payload(assistant.forecast_for_area(resolve_area(area)))
 
 
+@router.get("/near-term-forecast")
+def get_near_term_forecast(area: Optional[int] = None) -> dict:
+    chosen = resolve_area(area)
+    return near_term_forecast.page_payload(
+        near_term_forecast.latest_series(chosen), chosen
+    )
+
+
 @router.get("/areas")
 def get_areas() -> dict:
     return {
@@ -163,6 +177,15 @@ def change_area(body: AreaChange) -> dict:
     return {"status": "updated", "area": chosen.id, "area_name": chosen.display_name}
 
 
+@router.post("/rain-alerts")
+def change_rain_alerts(body: RainAlertChange) -> dict:
+    if not db.set_rain_alerts(body.endpoint, body.enabled):
+        raise HTTPException(status_code=404, detail="No such subscription.")
+    log.info("Rain alerts %s for a web subscription",
+             "enabled" if body.enabled else "disabled")
+    return {"status": "updated", "rain_alerts": body.enabled}
+
+
 @router.post("/unsubscribe")
 def unsubscribe(body: Unsubscribe) -> dict:
     db.delete_web_subscription(body.endpoint)
@@ -178,6 +201,7 @@ def whoami(body: Unsubscribe) -> dict:
         "known": subscription is not None,
         "is_admin": bool(subscription and subscription.is_admin),
         "area": subscription.area if subscription else None,
+        "rain_alerts": bool(subscription and subscription.rain_alerts),
     }
 
 

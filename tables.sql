@@ -39,4 +39,33 @@ CREATE TABLE web_subscriptions(
              area integer NOT NULL DEFAULT 1,
              created_at timestamptz NOT NULL DEFAULT now(),
              last_seen timestamptz,
-             is_admin boolean NOT NULL DEFAULT false);
+             is_admin boolean NOT NULL DEFAULT false,
+             rain_alerts boolean NOT NULL DEFAULT false);
+
+
+CREATE TABLE near_term_forecast(
+             id SERIAL PRIMARY KEY,
+             created_at timestamptz NOT NULL,
+             fetched_at timestamptz NOT NULL DEFAULT now(),
+             area integer NOT NULL,
+             radar_coverage text,
+             peak_precipitation_rate numeric,
+             total_precipitation numeric,
+             -- [{"time": "2026-09-09T13:40:00+00:00", "rate": 0.2}, ...]
+             series jsonb NOT NULL,
+             UNIQUE (area, created_at));
+
+CREATE INDEX idx_near_term_forecast_area_created
+             ON near_term_forecast(area, created_at DESC);
+
+CREATE TABLE rain_alert_log(
+             id SERIAL PRIMARY KEY,
+             area integer NOT NULL,
+             sent_at timestamptz NOT NULL DEFAULT now(),
+             kind text NOT NULL,
+             starts_at timestamptz NOT NULL,
+             peak_rate numeric NOT NULL,
+             recipients integer NOT NULL DEFAULT 0);
+
+CREATE INDEX idx_rain_alert_log_area_sent ON rain_alert_log(area, sent_at DESC);
+

@@ -6,13 +6,14 @@ import app_config
 import area
 
 user_agent = app_config.met_api['user-agent-header']
+timeout = 20
 
 ## todo: combine into one with input compact/complete
 def get_weather_compact(area : area.Area):
     base_url = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
     query_params = {'lat': round(area.latitude, 4), 'lon': round(area.longtitude, 4)}
     headers = {'User-Agent': user_agent}
-    response = requests.get(base_url, params=query_params, headers=headers)
+    response = requests.get(base_url, params=query_params, headers=headers, timeout=timeout)
     return response
 
 def get_weather_complete(area: area.Area, last_modified=None):
@@ -22,7 +23,7 @@ def get_weather_complete(area: area.Area, last_modified=None):
     if last_modified:
         headers['If-Modified-Since'] = last_modified
     print("Requesting forecast")
-    response = requests.get(base_url, params=query_params, headers=headers)
+    response = requests.get(base_url, params=query_params, headers=headers, timeout=timeout)
     return response
 
 def get_celestial(area: area.Area, date: date, last_modified=None):
@@ -31,7 +32,7 @@ def get_celestial(area: area.Area, date: date, last_modified=None):
     headers = {'User-Agent': user_agent}
     if last_modified:
         headers['If-Modified-Since'] = last_modified
-    response = requests.get(base_url, params=query_params, headers=headers)
+    response = requests.get(base_url, params=query_params, headers=headers, timeout=timeout)
     return response
 
 def get_nowcast(area: area.Area, last_modified=None):
@@ -40,5 +41,5 @@ def get_nowcast(area: area.Area, last_modified=None):
     headers = {'User-Agent': user_agent}
     if last_modified:
         headers['If-Modified-Since'] = last_modified
-    response = requests.get(base_url, params=query_params, headers=headers)
+    response = requests.get(base_url, params=query_params, headers=headers, timeout=timeout)
     return response

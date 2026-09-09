@@ -14,8 +14,8 @@ import db_connector as db
 log = logging.getLogger(__name__)
 
 # How long a push service should hold a notification for a device that is
-# offline. A forecast is stale after a day, so there is no point keeping it.
-TTL_SECONDS = 12 * 60 * 60
+# offline. 30 minutes is enough.
+TTL_SECONDS = 30 * 60
 
 # Push services return these when a subscription is permanently gone: the
 # browser was uninstalled, site data cleared, or the endpoint rotated.
@@ -100,11 +100,6 @@ def subscribed_areas() -> list[area.Area]:
 
 
 async def push_morning_forecast() -> None:
-    """The daily forecast, for browsers. Called from the bot's 07:15 job.
-
-    Awaitable because pywebpush blocks on the network; the sends run in a
-    thread so the bot's event loop keeps serving updates meanwhile.
-    """
     for area_obj in subscribed_areas():
         try:
             report = assistant.forecast_for_area(area_obj)
@@ -121,8 +116,20 @@ async def push_morning_forecast() -> None:
         )
 
 
+def send_to_rain_subscribers(area_obj: area.Area, title: str, body: str) -> int:
+    subscriptions = db.rain_alert_subscriptions_for_area(area_obj)
+    delivered = sum(
+        send_to_subscription(subscription, title, body, "rain-alert")
+        for subscription in subscriptions
+    )
+    log.info(
+        "Rain alert for %s: %s of %s delivered",
+        area_obj.display_name, delivered, len(subscriptions),
+    )
+    return delivered
+
+
 async def push_sun_update() -> None:
-    """Sun changes, for browsers. Called from the bot's 12:15 job."""
     for area_obj in subscribed_areas():
         try:
             sun_change_text = assistant.detect_sun_change_for_area(area_obj)

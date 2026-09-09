@@ -3,12 +3,20 @@ const PUSH_ENABLED = true;
 const els = {
   place: document.getElementById('place'),
   forecast: document.getElementById('forecast'),
+  rain: document.getElementById('rain'),
+  rainSummary: document.getElementById('rain-summary'),
+  rainUpdated: document.getElementById('rain-updated'),
+  rainBars: document.getElementById('rain-bars'),
+  rainTicks: document.getElementById('rain-ticks'),
+  rainTable: document.getElementById('rain-table'),
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
   iosHelp: document.getElementById('ios-help'),
   areaSelect: document.getElementById('area-select'),
   areaNote: document.getElementById('area-note'),
   testButton: document.getElementById('test-button'),
+  rainOptIn: document.getElementById('rain-opt-in'),
+  rainToggle: document.getElementById('rain-alerts-toggle'),
   glitterToggle: document.getElementById('glitter-toggle'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
@@ -62,6 +70,7 @@ async function changeArea(areaId) {
   rememberArea(areaId);
   els.areaNote.textContent = '';
   await loadForecast();
+  await loadNearTermForecast();
 
   if (!registration) return;
   const subscription = await registration.pushManager.getSubscription();
@@ -100,6 +109,105 @@ async function loadForecast() {
   } finally {
     els.forecast.setAttribute('aria-busy', 'false');
   }
+}
+
+const POLLING_REGION_TIME_ZONE = 'Europe/Oslo';
+const ACTIVE_POLL_MS = 10 * 60 * 1000;
+const SLEEP_CHECK_MS = 60 * 60 * 1000;
+
+const QUIET_HOURS_START = 23;
+const QUIET_HOURS_END = 6;
+
+function inQuietHours(hour) {
+  return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END;
+}
+
+function pollingRegionHour() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: POLLING_REGION_TIME_ZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  return Number(parts.find((part) => part.type === 'hour').value);
+}
+
+function nextNearTermForecastPoll() {
+  return inQuietHours(pollingRegionHour()) ? SLEEP_CHECK_MS : ACTIVE_POLL_MS;
+}
+
+async function loadNearTermForecast() {
+  try {
+    const url = selectedArea === null
+      ? '/api/near-term-forecast'
+      : `/api/near-term-forecast?area=${selectedArea}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+    const data = await res.json();
+    if (!data.available) {
+      els.rain.hidden = true;
+      return;
+    }
+    renderRainStrip(data);
+    els.rain.hidden = false;
+  } catch (err) {
+    els.rain.hidden = true;
+  }
+}
+
+function scheduleNearTermForecastPoll() {
+  setTimeout(async () => {
+    if (!inQuietHours(pollingRegionHour())) await loadNearTermForecast();
+    scheduleNearTermForecastPoll();
+  }, nextNearTermForecastPoll());
+}
+
+function renderRainStrip(data) {
+  els.rainSummary.textContent = data.summary;
+  els.rainUpdated.textContent = `Radar for ${data.area}, updated ${data.updated_at}.`;
+  const scale = Math.max(data.peak_rate, data.scale_floor);
+
+  els.rainBars.replaceChildren(
+    ...data.steps.map((step) => {
+      const bar = document.createElement('div');
+      bar.className = `rain-bar rain-${step.level}`;
+      if (step.level !== 'dry') {
+        const share = Math.min(step.rate / scale, 1) * 100;
+        bar.style.height = `max(3px, ${share}%)`;
+      }
+      bar.title = `${step.time} · ${step.rate.toFixed(1)} mm/h`;
+      return bar;
+    })
+  );
+
+  const steps = data.steps;
+  const ticks = steps.length
+    ? [steps[0], steps[Math.floor(steps.length / 2)], steps[steps.length - 1]]
+    : [];
+  els.rainTicks.replaceChildren(
+    ...ticks.map((step) => {
+      const span = document.createElement('span');
+      span.textContent = step.time;
+      return span;
+    })
+  );
+
+  const wet = steps.filter((step) => step.level !== 'dry');
+  els.rainTable.replaceChildren(
+    ...wet.map((step) => rainRow(step.time, `${step.rate.toFixed(1)} mm/h`))
+  );
+  if (!wet.length) {
+    els.rainTable.replaceChildren(rainRow('No rain in the window.'));
+  }
+}
+
+function rainRow(...cells) {
+  const row = document.createElement('tr');
+  for (const text of cells) {
+    const cell = document.createElement('td');
+    cell.textContent = text;
+    row.append(cell);
+  }
+  return row;
 }
 
 function isIOS() {
@@ -160,16 +268,17 @@ async function setUpPush() {
 function showSubscribed() {
   els.status.textContent = 'On — you will get the morning forecast and sun updates.';
   setButton('Turn off notifications', unsubscribe, true);
-  showTestButton();
+  showSubscriptionOptions();
 }
 
 function showUnsubscribed() {
   els.status.textContent = 'Off — turn them on for a morning forecast and sun updates.';
   setButton('Enable notifications', subscribe);
   els.testButton.hidden = true;
+  els.rainOptIn.hidden = true;
 }
 
-async function showTestButton() {
+async function showSubscriptionOptions() {
   try {
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) return;
@@ -181,15 +290,37 @@ async function showTestButton() {
     });
     if (!res.ok) return;
 
-    const { is_admin: isAdmin } = await res.json();
-    if (!isAdmin) return;
+    const { is_admin: isAdmin, rain_alerts: rainAlerts } = await res.json();
 
+    els.rainOptIn.hidden = false;
+    els.rainToggle.checked = rainAlerts;
+    els.rainToggle.onchange = () => saveRainAlerts(els.rainToggle.checked);
+
+    if (!isAdmin) return;
     els.testButton.hidden = false;
     els.testButton.disabled = false;
     els.testButton.textContent = 'Send a test notification';
     els.testButton.onclick = sendTestPush;
   } catch (err) {
-    console.warn('Could not check test-device status:', err);
+    console.warn('Could not check subscription options:', err);
+  }
+}
+
+async function saveRainAlerts(enabled) {
+  els.rainToggle.disabled = true;
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    const res = await fetch('/api/rain-alerts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint, enabled }),
+    });
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+  } catch (err) {
+    els.rainToggle.checked = !enabled;
+    els.areaNote.textContent = `Could not save that: ${err.message}`;
+  } finally {
+    els.rainToggle.disabled = false;
   }
 }
 
@@ -288,4 +419,8 @@ els.aboutToggle.onclick = () => {
 setUpAreas()
   .catch(() => { /* if can't load areas we don't crash the page*/ })
   .then(loadForecast)
-  .then(setUpPush);
+  .then(loadNearTermForecast)
+  .then(() => {
+    setUpPush();
+    scheduleNearTermForecastPoll();
+  });

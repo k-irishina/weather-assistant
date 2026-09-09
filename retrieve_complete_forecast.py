@@ -9,6 +9,7 @@ import app_config
 import area
 import db_connector as db
 import json_processor
+from json_processor import parse_http_date, parse_utc
 import yr_requests
 
 # Configure logging
@@ -17,13 +18,6 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 log = logging.getLogger(__name__)
-
-def parse_utc(iso_str: str) -> datetime:
-    """Parse an ISO-8601 instant from MET into a tz-aware UTC datetime."""
-    dt = datetime.fromisoformat(iso_str)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
 
 STORED_FORECAST_HOURS = timedelta(hours=48)
 
@@ -35,12 +29,6 @@ def hourly_entries(entries: list) -> list:
     horizon = parse_utc(entries[0]['forecast_time']) + STORED_FORECAST_HOURS
     return [e for e in entries if parse_utc(e['forecast_time']) <= horizon]
 
-
-def parse_http_date(header_value: str) -> datetime:
-    """Parse an HTTP date header, which RFC 9110 defines as always GMT."""
-    return datetime.strptime(header_value, "%a, %d %b %Y %H:%M:%S GMT").replace(
-        tzinfo=timezone.utc
-    )
 
 
 def fetch_forecast_for_area_id(area_id):
@@ -81,7 +69,7 @@ def fetch_forecast_for_area_id(area_id):
     with json_path.open('w') as f:
         json.dump(data, f, indent=4)
 
-    forecast_created_at = parse_utc(json_processor.forecast_created_at(data))
+    forecast_created_at = json_processor.created_at_utc(data)
 
     db_data = json_processor.create_data_json(data)
 

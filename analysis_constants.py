@@ -2,23 +2,38 @@ from typing import Optional
 
 default_area_id = 1
 
+#cloud cover
 max_total_clouds = 30.0
 percentage_total_clouds = 35.0
 max_total_clouds_when_weighted = 80.0
 low_cloud_weight = 0.7
 medium_cloud_weight = 0.3
 
+# hourly precipitation probability %
 min_precipitation_probability = 20.0
 high_possibility_precipitation = 50.0
 confident_hour_probability = 35.0
 possible_hour_probability = min_precipitation_probability / 2
 
+# wind m/s
 moderate_wind_speed = 5.0
 strong_wind_speed = 8.0
 
-
 moderate_gust_speed = 6.5
 strong_gust_speed = 9.0
+
+# live rain rates
+rain_starting_rate = 0.5
+moderate_rain_rate = 2.5
+heavy_rain_rate = 4.0
+min_wet_steps = 2
+
+
+# push notifications
+quiet_hours_start = 23
+quiet_hours_end = 6
+
+rain_alert_cooldown_minutes = 60
 
 CALM = "calm"
 MODERATE = "moderate"

@@ -492,6 +492,7 @@ class WebSubscription(NamedTuple):
     auth: str
     is_admin: bool = False
     area: Optional[int] = None
+    rain_alerts: bool = False
 
 
 def save_web_subscription(endpoint: str, p256dh: str, auth: str, area: area.Area):
@@ -531,7 +532,7 @@ def find_web_subscription(endpoint: str) -> Optional[WebSubscription]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT endpoint, p256dh, auth, is_admin, area
+                SELECT endpoint, p256dh, auth, is_admin, area, rain_alerts
                 FROM web_subscriptions
                 WHERE endpoint = %s
                 """,
@@ -574,3 +575,142 @@ def areas_with_web_subscribers() -> list[int]:
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT area FROM web_subscriptions")
             return [row[0] for row in cur.fetchall()]
+
+
+def insert_near_term_forecast_run(
+    created_at, area: area.Area, radar_coverage, peak_rate, total_precipitation, series
+) -> bool:
+    """Store one near-term forecast run. False means we already had it."""
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO near_term_forecast(created_at, area, radar_coverage,
+                                    peak_precipitation_rate, total_precipitation, series)
+                VALUES(%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (area, created_at) DO NOTHING
+                """,
+                (
+                    created_at,
+                    area.id,
+                    radar_coverage,
+                    peak_rate,
+                    total_precipitation,
+                    series,
+                ),
+            )
+            stored = cur.rowcount
+        conn.commit()
+    return stored > 0
+
+
+def latest_near_term_forecast_run(area: area.Area):
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT created_at, radar_coverage, series
+                FROM near_term_forecast
+                WHERE area = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (area.id,),
+            )
+            return cur.fetchone()
+
+
+def set_rain_alerts(endpoint: str, enabled: bool) -> bool:
+    """Opt web in or out of radar rain alerts. False if unknown."""
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE web_subscriptions
+                SET rain_alerts = %s, last_seen = now()
+                WHERE endpoint = %s
+                """,
+                (enabled, endpoint),
+            )
+            updated = cur.rowcount
+        conn.commit()
+    return updated > 0
+
+
+def rain_alert_subscriptions_for_area(area_obj: area.Area) -> list[WebSubscription]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT endpoint, p256dh, auth, is_admin
+                FROM web_subscriptions
+                WHERE area = %s AND rain_alerts = TRUE
+                """,
+                (area_obj.id,),
+            )
+            return [WebSubscription(*row) for row in cur.fetchall()]
+
+
+def morning_baseline_precipitation(
+    area_obj: area.Area, issued_before: datetime
+) -> Optional[dict[datetime, float]]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT forecast_time,
+                       (forecast_data->'next_1_hours'->>'probability_of_precipitation')::numeric
+                FROM forecast_complete
+                WHERE area = %(area)s
+                  AND forecast_created_at = (
+                      SELECT MAX(forecast_created_at)
+                      FROM forecast_complete
+                      WHERE area = %(area)s
+                        AND forecast_created_at <= %(issued_before)s
+                  )
+                """,
+                {"area": area_obj.id, "issued_before": issued_before},
+            )
+            rows = cur.fetchall()
+
+    if not rows:
+        return None
+    return {
+        forecast_time: float(probability)
+        for forecast_time, probability in rows
+        if probability is not None
+    }
+
+
+def last_rain_alert_at(area_obj: area.Area) -> Optional[datetime]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT sent_at
+                FROM rain_alert_log
+                WHERE area = %s
+                ORDER BY sent_at DESC
+                LIMIT 1
+                """,
+                (area_obj.id,),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
+def log_rain_alert(
+    area_obj: area.Area, kind: str, starts_at: datetime, peak_rate: float,
+    recipients: int,
+) -> None:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO rain_alert_log(area, kind, starts_at, peak_rate, recipients)
+                VALUES(%s, %s, %s, %s, %s)
+                """,
+                (area_obj.id, kind, starts_at, peak_rate, recipients),
+            )
+            conn.commit()
+

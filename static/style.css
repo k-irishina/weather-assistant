@@ -6,6 +6,10 @@
   --line: #dde3ea;
   --accent: #1b2a41;
   --sun: #f5b301;
+  --rain-light: #86b6ef;
+  --rain-moderate: #2a78d6;
+  --rain-heavy: #104281;
+  --rain-track: #eef2f7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -16,6 +20,10 @@
     --muted: #94a3b8;
     --line: #2b3849;
     --accent: #f5b301;
+    --rain-light: #3987e5;
+    --rain-moderate: #6da7ec;
+    --rain-heavy: #b7d3f6;
+    --rain-track: #243044;
   }
 }
 
@@ -207,4 +215,58 @@ select {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.rain-strip {
+  margin: 12px 0 6px;
+}
+
+.rain-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 72px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rain-bar {
+  flex: 1 1 0;
+  max-width: 24px;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--rain-track);
+}
+
+.rain-bar.rain-light { background: var(--rain-light); }
+.rain-bar.rain-moderate { background: var(--rain-moderate); }
+.rain-bar.rain-heavy { background: var(--rain-heavy); }
+
+.rain-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rain-details {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.rain-details summary {
+  cursor: pointer;
+}
+
+.rain-details table {
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rain-details td {
+  padding: 2px 12px 2px 0;
 }

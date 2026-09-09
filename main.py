@@ -1,4 +1,5 @@
 #Single entry for the Telegram bot and the web app
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,17 +32,20 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     bot = tg_bot.build_application()
 
-    # Same order as Application.run_polling: initialize, poll, then start the
-    # update processor (which also starts the job queue and its daily jobs).
+
     await bot.initialize()
     await bot.updater.start_polling(**tg_bot.POLLING_KWARGS)
     await bot.start()
+    background_tasks = await tg_bot.start_background_jobs(bot)
     log.info("Telegram bot polling; web app ready")
 
     app.state.bot = bot
     try:
         yield
     finally:
+        for task in background_tasks:
+            task.cancel()
+        await asyncio.gather(*background_tasks, return_exceptions=True)
         await bot.updater.stop()
         await bot.stop()
         await bot.shutdown()

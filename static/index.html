@@ -1,78 +1,103 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Weather Assistant</title>
-<meta name="theme-color" content="#1b2a41">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Weather">
-<link rel="stylesheet" href="/style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Weather Assistant</title>
+  <meta name="theme-color" content="#1b2a41">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Weather">
+  <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
-<main>
-  <header>
-    <div class="header-buttons">
-      <button id="about-toggle" class="icon-button" type="button" aria-expanded="false"
-        aria-controls="about" aria-label="About this app" title="About">?</button>
-      <button id="glitter-toggle" class="icon-button" type="button"
-        aria-pressed="false" aria-label="Toggle glitter mode" title="Glitter mode">✨</button>
-    </div>
-    <h1>Weather Assistant</h1>
-    <p class="place" id="place">Loading…</p>
-  </header>
+  <main>
+    <header>
+      <div class="header-buttons">
+        <button id="about-toggle" class="icon-button" type="button" aria-expanded="false" aria-controls="about"
+          aria-label="About this app" title="About">?</button>
+        <button id="glitter-toggle" class="icon-button" type="button" aria-pressed="false"
+          aria-label="Toggle glitter mode" title="Glitter mode">✨</button>
+      </div>
+      <h1>Weather Assistant</h1>
+      <p class="place" id="place">Loading…</p>
+    </header>
 
-  <section id="about" class="card" hidden>
-    <h2>What does this do?</h2>
-    <p>This page provides you with a compact and efficient forecast for the chosen location. </p>
-    <p>You no longer need to dig into the hourly forecast - this provides you with all the info you <em>actually</em> care about.</p>
-    <p>Average temp, rain, sun, wind and UV index for the day. Simple and easy.</p>
-    <p>If you turn on notifications, you will get push notifications for the chosen location:</p>
-    <ul>
-      <li><strong>Morning forecast</strong> — every day at 07:15</li>
-      <li><strong>Sunshine update</strong> — at 12:15 if the sun
-      outlook for the day has changed - so you can use it as you should 🌞</li>
-    </ul>
-    <p class="muted">*Times are GMT+2.</p>
-    <br>
-    <p>For more locations and/or any questions, contact the person who gave you the link :-P</p>
-  </section>
+    <section id="about" class="card" hidden>
+      <h2>What does this do?</h2>
+      <p>This page provides you with a compact and efficient forecast for the chosen location. </p>
+      <p>You no longer need to dig into the hourly forecast - this provides you with all the info you <em>actually</em>
+        care about.</p>
+      <p>Average temp, rain, sun, wind and UV index for the day. Simple and easy.</p>
+      <p>If you turn on notifications, you will get push notifications for the chosen location:</p>
+      <ul>
+        <li><strong>Morning forecast</strong> — every day at 07:15</li>
+        <li><strong>Sunshine update</strong> — at 12:15 if the sun
+          outlook for the day has changed - so you can use it as you should 🌞</li>
+      </ul>
+      <p class="muted">*Times are GMT+2.</p>
+      <br>
+      <p>For more locations and/or any questions, contact the person who gave you the link :-P</p>
+    </section>
 
-  <section id="forecast" class="card" aria-live="polite" aria-busy="true">
-    <p class="muted">Fetching the forecast…</p>
-  </section>
+    <section id="forecast" class="card" aria-live="polite" aria-busy="true">
+      <p class="muted">Fetching the forecast…</p>
+    </section>
 
-  <section class="card">
-    <h2>Location</h2>
-    <label class="sr-only" for="area-select">Forecast location</label>
-    <select id="area-select"><option>Loading…</option></select>
-    <p class="muted" id="area-note"></p>
-  </section>
+    <section id="rain" class="card" hidden>
+      <h2>Two-hour rain:</h2>
+      <p class="muted" id="rain-summary"></p>
+      <div class="rain-strip">
+        <div class="rain-bars" id="rain-bars" role="img" aria-label="Rain rate for the next two hours"></div>
+        <div class="rain-ticks" id="rain-ticks"></div>
+      </div>
+      <details class="rain-details">
+        <summary>Show the numbers</summary>
+        <table id="rain-table"></table>
+      </details>
+      <p class="muted" id="rain-updated"></p>
+    </section>
 
-  <section class="card">
-    <h2>Notifications</h2>
-    <p class="muted" id="push-status">Checking…</p>
-    <button id="push-button" hidden></button>
-    <button id="test-button" class="secondary" hidden>Test notification</button>
-    <div id="ios-help" hidden>
-      <p>On iPhone and iPad, notifications only work once this page is on your
-      Home Screen:</p>
-      <ol>
-        <li>Tap the <strong>Share</strong> button below</li>
-        <li>Choose <strong>Add to Home Screen</strong></li>
-        <li>Open it from the new icon, then come back here</li>
-      </ol>
-    </div>
-  </section>
+    <section class="card">
+      <h2>Location</h2>
+      <label class="sr-only" for="area-select">Forecast location</label>
+      <select id="area-select">
+        <option>Loading…</option>
+      </select>
+      <p class="muted" id="area-note"></p>
+    </section>
 
-  <footer>
-    <p class="muted">Forecast data from
-      <a href="https://api.met.no/">MET Norway</a>. On Telegram as
-      @WhisperWeatherBot.</p>
-  </footer>
-</main>
-<script src="/app.js"></script>
+    <section class="card">
+      <h2>Notifications</h2>
+      <p class="muted" id="push-status">Checking…</p>
+      <button id="push-button" hidden></button>
+      <button id="test-button" class="secondary" hidden>Test notification</button>
+      <label id="rain-opt-in" hidden>
+        <input type="checkbox" id="rain-alerts-toggle">
+        Enable unpredicted rain notifications too
+      </label>
+      <div id="ios-help" hidden>
+        <p>On iPhone and iPad, notifications only work once this page is on your
+          Home Screen:</p>
+        <ol>
+          <li>Tap the <strong>Share</strong> button below</li>
+          <li>Choose <strong>Add to Home Screen</strong></li>
+          <li>Open it from the new icon, then come back here</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer>
+      <p class="muted">Made by <a href="https://sleepingonmars.neopets.com/">sleepingonmars</a>. Forecast data from
+        <a href="https://api.met.no/">MET Norway</a>. On Telegram as
+        @WhisperWeatherBot.
+      </p>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
 </body>
+
 </html>
