@@ -100,6 +100,13 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
             "emoji": report["precipitation"]["emoji_active"],
             "likely": [_hour(hour) for hour in sorted(report["precipitation_high"])],
             "possible": [_hour(hour) for hour in sorted(report["precipitation_possible"])],
+            # set instead of the hour lists when the timing is unclear.
+            "window_chance": (
+                None
+                if report["precipitation_window"] is None
+                else round(_number(report["precipitation_window"]))
+            ),
+            "window_hours": [_hour(hour) for hour in report["precipitation_window_hours"]],
         },
         "wind": wind,
         "text": assistant.format_forecast_text(report, greeting),

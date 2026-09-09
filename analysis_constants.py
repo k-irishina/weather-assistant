@@ -10,6 +10,8 @@ medium_cloud_weight = 0.3
 
 min_precipitation_probability = 20.0
 high_possibility_precipitation = 50.0
+confident_hour_probability = 35.0
+possible_hour_probability = min_precipitation_probability / 2
 
 moderate_wind_speed = 5.0
 strong_wind_speed = 8.0

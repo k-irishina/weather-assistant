@@ -225,14 +225,17 @@ def evaluate_clouds(
     return unique_cloud_coverage
 
 
-def evaluate_precipitation(area: area.Area, date: date) -> dict[time, float]:
+def precipitation_probabilities(
+    area: area.Area, date: date, window: str
+) -> dict[time, float]:
+    """Latest stored probability per hour, read from a next_1_hours/next_6_hours block."""
     timezone = str(area.region.timezone)
     day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
                     WITH latest_data AS (
-                    SELECT forecast_time, forecast_data->'next_1_hours'->>'probability_of_precipitation' AS precip
+                    SELECT forecast_time, forecast_data->%(window)s->>'probability_of_precipitation' AS precip
                         FROM forecast_complete
                         WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
                           AND area = %(area)s
@@ -246,7 +249,7 @@ def evaluate_precipitation(area: area.Area, date: date) -> dict[time, float]:
                     )
                     SELECT (forecast_time AT TIME ZONE %(tz)s)::time, precip::numeric
                     FROM latest_data
-                    WHERE precip::numeric >= %(min_probability)s
+                    WHERE precip IS NOT NULL
                     ORDER BY forecast_time;
                 """
             cursor.execute(
@@ -256,14 +259,14 @@ def evaluate_precipitation(area: area.Area, date: date) -> dict[time, float]:
                     "day_start": day_start,
                     "day_end": day_end,
                     "area": area.id,
-                    "min_probability": analysis_constants.min_precipitation_probability,
+                    "window": window,
                 },
             )
             results = cursor.fetchall()
 
-            precip_results = {row[0]: row[1] for row in results}
+    return {row[0]: row[1] for row in results}
 
-    return precip_results
+
 
 
 def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:

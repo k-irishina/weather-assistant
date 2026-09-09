@@ -2,7 +2,7 @@ import logging as log
 import random
 from datetime import date, datetime, time, timedelta
 from statistics import mean
-from typing import Optional, TypedDict
+from typing import NamedTuple, Optional, TypedDict
 
 import analysis_constants as constants
 import area
@@ -30,6 +30,8 @@ class ForecastReport(TypedDict):
     precipitation: Precipitation
     precipitation_high: list[time]
     precipitation_possible: list[time]
+    precipitation_window: Optional[float]
+    precipitation_window_hours: list[time]
     wind_by_hour: dict[time, db_connector.WindReading]
 
 
@@ -52,8 +54,11 @@ def forecast_for_area(area_obj: area.Area) -> ForecastReport:
         sunrise_sunset["sunrise_time"],
         sunrise_sunset["sunset_time"],
     )
-    precipitation_pct_by_hour = db_connector.evaluate_precipitation(
-        area_obj, forecast_day
+    precipitation_pct_by_hour = db_connector.precipitation_probabilities(
+        area_obj, forecast_day, "next_1_hours"
+    )
+    window_pct_by_hour = db_connector.precipitation_probabilities(
+        area_obj, forecast_day, "next_6_hours"
     )
     uv_index = db_connector.highest_uv_index(area_obj, forecast_day)
     wind_by_hour = db_connector.evaluate_wind(area_obj, forecast_day)
@@ -61,16 +66,10 @@ def forecast_for_area(area_obj: area.Area) -> ForecastReport:
     from_hour = current_hour_cutoff(local_now, forecast_day)
     sunny_times = from_hour_onwards(sunny_times, from_hour)
     precipitation_pct_by_hour = from_hour_onwards(precipitation_pct_by_hour, from_hour)
+    window_pct_by_hour = from_hour_onwards(window_pct_by_hour, from_hour)
     wind_by_hour = from_hour_onwards(wind_by_hour, from_hour)
 
-    highprcpt = []
-    potentialprcpt = []
-
-    for hour, probability in precipitation_pct_by_hour.items():
-        if probability > constants.high_possibility_precipitation:
-            highprcpt.append(hour)
-        else:
-            potentialprcpt.append(hour)
+    outlook = classify_precipitation(precipitation_pct_by_hour, window_pct_by_hour)
 
     return ForecastReport(
         area_id=area_obj.id,
@@ -83,10 +82,47 @@ def forecast_for_area(area_obj: area.Area) -> ForecastReport:
         sunrise_sunset=sunrise_sunset,
         sunny_times=sunny_times,
         precipitation=precipitation_type(avg_temperatures),
-        precipitation_high=highprcpt,
-        precipitation_possible=potentialprcpt,
+        precipitation_high=outlook.high,
+        precipitation_possible=outlook.possible,
+        precipitation_window=outlook.window_probability,
+        precipitation_window_hours=outlook.window_hours,
         wind_by_hour=wind_by_hour,
     )
+
+
+class PrecipitationOutlook(NamedTuple):
+    high: list[time]
+    possible: list[time]
+    # the two below are set instead of the hour lists when the timing is unresolved
+    window_probability: Optional[float]
+    window_hours: list[time]
+
+
+def classify_precipitation(hourly: dict, window: dict) -> PrecipitationOutlook:
+    named = {
+        hour: probability
+        for hour, probability in hourly.items()
+        if probability >= constants.min_precipitation_probability
+    }
+    if max(named.values(), default=0) >= constants.confident_hour_probability:
+        high = [
+            hour
+            for hour, probability in named.items()
+            if probability > constants.high_possibility_precipitation
+        ]
+        possible = [hour for hour in named if hour not in high]
+        return PrecipitationOutlook(high, possible, None, [])
+
+    peak_window = max(window.values(), default=0)
+    if peak_window < constants.min_precipitation_probability:
+        return PrecipitationOutlook([], [], None, [])
+
+    span = [
+        hour
+        for hour, probability in hourly.items()
+        if probability >= constants.possible_hour_probability
+    ]
+    return PrecipitationOutlook([], [], peak_window, sorted(span))
 
 
 def format_forecast_text(report: ForecastReport, greeting: Optional[str] = None) -> str:
@@ -105,7 +141,7 @@ Forecast for {day_text}, {report["area_name"]}:
 Max UV index: {round(report["uv_index"])}
 
 {compose_sunny_text(report["sunny_times"])}
-{compose_precipitation_text(report["precipitation_high"], report["precipitation_possible"], report["precipitation"])}
+{compose_precipitation_text(report["precipitation_high"], report["precipitation_possible"], report["precipitation_window"], report["precipitation_window_hours"], report["precipitation"])}
 {compose_wind_text(report["wind_by_hour"])}
 """
 
@@ -193,14 +229,23 @@ def format_hour(hour) -> str:
 def format_temperature(value) -> str:
     return "no data" if value is None else f"{value} °C"
 
-def compose_precipitation_text(highprcpt, potentialprcpt, precipitation):
+def compose_precipitation_text(
+    highprcpt, potentialprcpt, window_probability, window_hours, precipitation
+):
     text = ''
     if highprcpt:
         text += f'High potential for {precipitation["name"]} at {format_hours(sorted(highprcpt))} {precipitation["emoji_active"]}\n'
     if potentialprcpt:
         text += f'Possible {precipitation["name"]} at {format_hours(sorted(potentialprcpt))}.\n'
     if not highprcpt and not potentialprcpt:
-        text += f'No {precipitation["name"]} in sight! {precipitation["emoji_inactive"]}\n'
+        if window_probability is None:
+            text += f'No {precipitation["name"]} in sight! {precipitation["emoji_inactive"]}\n'
+        else:
+            span = f' {format_hours(window_hours)}' if window_hours else ''
+            text += (
+                f'{precipitation["emoji_active"]} Potential for {precipitation["name"]}{span} '
+                f'({round(window_probability)}% chance)\n'
+            )
     return text
 
 

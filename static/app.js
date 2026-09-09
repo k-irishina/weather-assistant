@@ -252,7 +252,7 @@ async function subscribe() {
 }
 
 async function unsubscribe() {
-  if (!confirm('Turn off notifications? You will stop getting the morning forecast and sun updates.')) {
+  if (!confirm('Are you sure you want to stop receiving notifications?')) {
     return;
   }
   els.button.disabled = true;
