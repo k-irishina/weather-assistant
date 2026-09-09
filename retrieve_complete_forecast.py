@@ -1,6 +1,5 @@
 import json
 import logging
-import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -18,22 +17,6 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 log = logging.getLogger(__name__)
-
-def prune_old_responses(data_dir: Path) -> int:
-    retention_days = app_config.data_retention_days
-    if not retention_days:
-        return 0
-
-    cutoff = time_module.time() - retention_days * 86400
-    removed = 0
-    for path in data_dir.glob("*.json"):
-        if path.stat().st_mtime < cutoff:
-            path.unlink()
-            removed += 1
-    if removed:
-        log.info(f"Pruned {removed} response files older than {retention_days} days")
-    return removed
-
 
 def parse_utc(iso_str: str) -> datetime:
     """Parse an ISO-8601 instant from MET into a tz-aware UTC datetime."""
@@ -98,8 +81,6 @@ def fetch_forecast_for_area_id(area_id):
     with json_path.open('w') as f:
         json.dump(data, f, indent=4)
 
-    #prune_old_responses(DATA_DIR)
-    
     forecast_created_at = parse_utc(json_processor.forecast_created_at(data))
 
     db_data = json_processor.create_data_json(data)

@@ -159,15 +159,16 @@ def compose_wind_text(wind_by_hour: dict) -> str:
     speeds = [r.speed for r in wind_by_hour.values() if r.speed is not None]
     gusts = [r.gust for r in wind_by_hour.values() if r.gust is not None]
     peak = f"up to {max(speeds):g} m/s" if speeds else ""
-    if gusts:
-        peak += f", gusts {max(gusts):g} m/s"
+    # if gusts:
+    #     peak += f", gusts {max(gusts):g} m/s"
 
     text = ""
     if strong:
         text += f'🌬️ Strong wind at {format_hours(strong)}.\n'
     if moderate:
         text += f'💨 Moderate wind at {format_hours(moderate)}.\n'
-    return text + f"Peak {peak}." if peak else text.rstrip()
+    return text.rstrip()
+# + f"Peak {peak}." if peak else text.rstrip()
 
 
 def format_hours(hours) -> str:

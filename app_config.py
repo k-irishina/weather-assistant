@@ -62,13 +62,6 @@ _web.setdefault("host", "0.0.0.0")
 _web["port"] = int(os.environ.get("PORT") or _web.get("port") or 8000)
 web = _web
 
-# delete JSON responses in data/ older than this many days. Unset keeps them all
-data_retention_days = os.environ.get("DATA_RETENTION_DAYS") or (
-    config.get("data") or {}
-).get("retention-days")
-if data_retention_days is not None:
-    data_retention_days = int(data_retention_days)
-
 log_level = (os.environ.get("LOG_LEVEL") or config.get("log-level") or "DEBUG").upper()
 
 def _missing_settings() -> list[str]:

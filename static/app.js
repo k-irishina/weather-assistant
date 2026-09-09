@@ -90,7 +90,7 @@ async function loadForecast() {
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
 
-    els.place.textContent = `${data.area} · sunrise ${data.sunrise}, sunset ${data.sunset}`;
+    els.place.textContent = `${data.area} · 🌅 ${data.sunrise}, 🌇 ${data.sunset}`;
     const pre = document.createElement('pre');
     pre.textContent = data.text.trim();
     els.forecast.replaceChildren(pre);
@@ -252,6 +252,9 @@ async function subscribe() {
 }
 
 async function unsubscribe() {
+  if (!confirm('Turn off notifications? You will stop getting the morning forecast and sun updates.')) {
+    return;
+  }
   els.button.disabled = true;
   try {
     const subscription = await registration.pushManager.getSubscription();

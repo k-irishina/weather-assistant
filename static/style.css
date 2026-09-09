@@ -152,9 +152,11 @@ button.secondary {
   border-radius: 999px;
 }
 
+#about-toggle[aria-expanded="true"],
 #glitter-toggle[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
+  color: var(--bg);
 }
 
 ol, ul {
