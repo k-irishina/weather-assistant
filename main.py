@@ -9,6 +9,13 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 import app_config
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=app_config.log_level,
+)
+log = logging.getLogger(__name__)
+
 import tg_bot
 import web_api
 
@@ -20,12 +27,6 @@ class RevalidatingStaticFiles(StaticFiles):
         response = super().file_response(*args, **kwargs)
         response.headers["Cache-Control"] = "no-cache"
         return response
-
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=app_config.log_level,
-)
-log = logging.getLogger(__name__)
 
 
 @asynccontextmanager

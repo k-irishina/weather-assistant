@@ -12,11 +12,6 @@ import json_processor
 from json_processor import parse_http_date, parse_utc
 import yr_requests
 
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.DEBUG
-)
 log = logging.getLogger(__name__)
 
 STORED_FORECAST_HOURS = timedelta(hours=48)
