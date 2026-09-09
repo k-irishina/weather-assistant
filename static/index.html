@@ -28,8 +28,8 @@
 
     <section id="about" class="card" hidden>
       <h2>What does this do?</h2>
-      <p>This page provides you with a compact and efficient forecast for the chosen location. </p>
-      <p>You no longer need to dig into the hourly forecast - this provides you with all the info you <em>actually</em>
+      <p>wASS provides you with a compact and efficient forecast for the chosen location. </p>
+      <p>You no longer need to dig into other hourly forecasts - wASS provides you with all the info you <em>actually</em>
         care about.</p>
       <p>Average temp, rain, sun, wind and UV index for the day. Simple and easy.</p>
       <p>If you turn on notifications, you will get push notifications for the chosen location:</p>
@@ -37,10 +37,11 @@
         <li><strong>Morning forecast</strong> — every day at 07:15</li>
         <li><strong>Sunshine update</strong> — at 12:15 if the sun
           outlook for the day has changed - so you can use it as you should 🌞</li>
+        <li><strong>Rain updates*</strong> — you will be notified if your morning forecast did not indicate rain or if strong rain is incoming.</li>
       </ul>
-      <p class="muted">*Times are GMT+2.</p>
-      <br>
-      <p>For more locations and/or any questions, contact the person who gave you the link :-P</p>
+      <p class="muted">* This is an experimental opt-in feature.</p>
+      <p class="muted">Times are GMT+2.</p>
+      <p>To add locations or report issues, please contact sleepingonmars.</p>
     </section>
 
     <section id="forecast" class="card" aria-live="polite" aria-busy="true">
@@ -77,7 +78,7 @@
       <button id="test-button" class="secondary" hidden>Test notification</button>
       <label id="rain-opt-in" hidden>
         <input type="checkbox" id="rain-alerts-toggle">
-        Enable unpredicted rain notifications too
+        Give me unpredicted rain notifications too!
       </label>
       <div id="ios-help" hidden>
         <p>On iPhone and iPad, notifications only work once this page is on your
@@ -91,7 +92,7 @@
     </section>
 
     <footer>
-      <p class="muted">Made by <a href="https://sleepingonmars.neopets.com/">sleepingonmars</a>. Forecast data from
+      <p class="muted">Made by <a href="https://sleepingonmars.neocities.org/">sleepingonmars</a>. Forecast data from
         <a href="https://api.met.no/">MET Norway</a>. On Telegram as
         @WhisperWeatherBot.
       </p>

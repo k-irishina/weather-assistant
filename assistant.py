@@ -257,21 +257,22 @@ def get_greeting(current_hour: int = None):
     greetings = [
         (
             (5, 12),
-            ["Goood morning! 🐦", "Good morning! ☀🐓", "Labrīt!"],
+            ["Goood morning! 🐦", "Good morning! ☀🐓", "Labrīt!", "Coffee, tea, yerba mate..."],
         ),
         (
             (12, 18),
             [
                 "Good afternoon!",
                 "Has your day been good to you so far?",
-                "Enjoying the weather?",
+                "Enjoying the weather?"
+                "Well hello there!"
             ],
         ),
         (
             (18, 23),
             [
                 "Good evening 🌆",
-                "Looking good over there!",
+                "Looking good over there 😎",
                 "Glad to see you again!",
                 "Ciao!",
                 "Greetings, human!",

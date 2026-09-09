@@ -149,6 +149,25 @@ button.secondary {
   border: 1px solid var(--line);
 }
 
+#rain-opt-in {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .75rem;
+  color: var(--ink);
+}
+
+#rain-opt-in[hidden] {
+  display: none;
+}
+
+#rain-opt-in input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .icon-button {
   width: 2.2rem;
   height: 2.2rem;
