@@ -103,7 +103,7 @@ async def push_morning_forecast() -> None:
     for area_obj in subscribed_areas():
         try:
             report = assistant.forecast_for_area(area_obj)
-            text = assistant.format_forecast_text(report)
+            text = assistant.format_forecast_text_short(report)
         except Exception:
             log.exception("Could not build forecast for %s", area_obj.display_name)
             continue

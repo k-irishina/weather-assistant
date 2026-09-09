@@ -146,6 +146,45 @@ Max UV index: {round(report["uv_index"])}
 """
 
 
+def format_forecast_text_short(report: ForecastReport) -> str:
+    """For push notification messages to be readable"""
+    temps = report["temperatures"]
+    temp_part = "/".join(
+        compact_temperature(temps.get(key, {}).get("avg_temperature"))
+        for _, key, _ in temperature_periods
+    )
+
+    lines = [f"{temp_part} {compact_precipitation_text(report)}"]
+
+    if report["sunny_times"]:
+        lines.append(f"🌞 {format_hours(sorted(report['sunny_times']))}")
+
+    windy_hours = sorted({
+        hour for hour, reading in report["wind_by_hour"].items()
+        if constants.wind_strength(reading.speed, reading.gust, reading.percentile_90)
+        in (constants.MODERATE, constants.STRONG)
+    })
+    if windy_hours:
+        lines.append(f"💨 {format_hours(windy_hours)}")
+
+    return "\n".join(lines)
+
+
+def compact_temperature(value: Optional[float]) -> str:
+    return "–" if value is None else f"{round(float(value))}°"
+
+
+def compact_precipitation_text(report: ForecastReport) -> str:
+    precipitation = report["precipitation"]
+    hours = sorted(set(report["precipitation_high"]) | set(report["precipitation_possible"]))
+    if hours:
+        return f'{precipitation["emoji_active"]} {precipitation["name"]} {format_hours(hours)}'
+    if report["precipitation_window_hours"]:
+        return (f'{precipitation["emoji_active"]} maybe {precipitation["name"]} '
+                f'{format_hours(report["precipitation_window_hours"])}')
+    return f'{precipitation["emoji_inactive"]} no {precipitation["name"]}'
+
+
 def morning_forecast(user_id):
     area_id = db_connector.fetch_user_location(user_id)
     area_obj = area.areas.get(area_id, area.areas[constants.default_area_id])
