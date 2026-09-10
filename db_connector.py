@@ -137,13 +137,18 @@ def select_related_temperatures(area: area.Area, date):
                 GROUP BY forecast_time
             )
       )
-    SELECT 
+    SELECT
     CASE
         WHEN local_ts::time IN ('06:00:00', '07:00:00', '08:00:00') THEN 'morning'
         WHEN local_ts::time IN ('12:00:00', '13:00:00', '14:00:00') THEN 'midday'
         WHEN local_ts::time IN ('18:00:00', '19:00:00', '20:00:00') THEN 'evening'
     END AS time_period,
-    ROUND(AVG((forecast_data->>'air_temperature')::numeric), 1) AS avg_temperature
+    ROUND(AVG((forecast_data->>'air_temperature')::numeric), 1) AS avg_temperature,
+    COALESCE(
+        MAX(forecast_data->'next_1_hours'->>'symbol_code')
+            FILTER (WHERE local_ts::time IN ('07:00:00', '13:00:00', '19:00:00')),
+        MAX(forecast_data->'next_1_hours'->>'symbol_code')
+    ) AS symbol_code
     FROM latest_rows
     GROUP BY time_period;
 """
@@ -162,11 +167,16 @@ def select_related_temperatures(area: area.Area, date):
             results = cursor.fetchall()
 
             # Process results into a dictionary
-            formatted_results = {row[0]: {"avg_temperature": row[1]} for row in results}
+            formatted_results = {
+                row[0]: {"avg_temperature": row[1], "symbol_code": row[2]}
+                for row in results
+            }
 
             # in case of missing data
             for period in ["morning", "midday", "evening"]:
-                formatted_results.setdefault(period, {"avg_temperature": None})
+                formatted_results.setdefault(
+                    period, {"avg_temperature": None, "symbol_code": None}
+                )
 
     return formatted_results
 

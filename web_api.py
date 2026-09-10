@@ -4,6 +4,7 @@ The page is the same assistant as the Telegram bot, for people who don't use
 Telegram.
 """
 import logging
+from pathlib import Path
 from datetime import time
 from typing import Optional
 
@@ -67,11 +68,28 @@ def _number(value) -> Optional[float]:
     return None if value is None else float(value)
 
 
+WEATHER_ICON_DIR = Path(__file__).resolve().parent / "static" / "icons" / "weather-icons"
+
+
+def _symbol_icon(symbol_code: Optional[str]) -> Optional[str]:
+    if not symbol_code:
+        return None
+    if not (WEATHER_ICON_DIR / f"{symbol_code}.png").is_file():
+        log.warning("No weather icon for symbol_code %r", symbol_code)
+        return None
+    return f"/icons/weather-icons/{symbol_code}.png"
+
+
 def forecast_payload(report: assistant.ForecastReport) -> dict:
     cutoff = report["from_hour"]
     temperatures = {
-        key: _number(report["temperatures"][key]["avg_temperature"])
-        for _, key, until in assistant.temperature_periods
+        key: {
+            "label": label,
+            "temperature": _number(report["temperatures"][key]["avg_temperature"]),
+            "symbol_code": report["temperatures"][key].get("symbol_code"),
+            "icon": _symbol_icon(report["temperatures"][key].get("symbol_code")),
+        }
+        for label, key, until in assistant.temperature_periods
         if key in report["temperatures"] and (cutoff is None or until > cutoff)
     }
 
@@ -115,7 +133,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
             "window_hours": [_hour(hour) for hour in report["precipitation_window_hours"]],
         },
         "wind": wind,
-        "text": assistant.format_forecast_text(report, greeting),
+        "conditions": assistant.conditions(report),
     }
 
 

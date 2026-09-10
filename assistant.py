@@ -16,6 +16,12 @@ class Precipitation(TypedDict):
     emoji_inactive: str
 
 
+class WeatherCondition(TypedDict):
+    kind: str
+    emoji: str
+    text: str
+
+
 class ForecastReport(TypedDict):
     area_id: int
     area_name: str
@@ -138,12 +144,28 @@ Forecast for {day_text}, {report["area_name"]}:
 
 {compose_temperature_text(report["temperatures"], report["from_hour"])}
 
-Max UV index: {round(report["uv_index"])}
-
-{compose_sunny_text(report["sunny_times"])}
-{compose_precipitation_text(report["precipitation_high"], report["precipitation_possible"], report["precipitation_window"], report["precipitation_window_hours"], report["precipitation"])}
-{compose_wind_text(report["wind_by_hour"])}
+{compose_conditions_text(report)}
 """
+
+
+def conditions(report: ForecastReport) -> list["WeatherCondition"]:
+    items = sunny_conditions(report["sunny_times"])
+    items += precipitation_conditions(
+        report["precipitation_high"], report["precipitation_possible"],
+        report["precipitation_window"], report["precipitation_window_hours"],
+        report["precipitation"],
+    )
+    items += wind_conditions(report["wind_by_hour"])
+    if report["uv_index"] is not None:
+        items.append(WeatherCondition(
+            kind="uv", emoji="☀️",
+            text=f'Max UV index: {round(report["uv_index"])}',
+        ))
+    return items
+
+
+def compose_conditions_text(report: ForecastReport) -> str:
+    return "\n".join(f'{item["emoji"]} {item["text"]}' for item in conditions(report))
 
 
 def format_forecast_text_short(report: ForecastReport) -> str:
@@ -217,7 +239,7 @@ def from_hour_onwards(by_hour: dict, cutoff: Optional[time]) -> dict:
     return {hour: value for hour, value in by_hour.items() if hour >= cutoff}
 
 
-def compose_wind_text(wind_by_hour: dict) -> str:
+def wind_conditions(wind_by_hour: dict) -> list["WeatherCondition"]:
     strong, moderate = [], []
     for hour, reading in sorted(wind_by_hour.items()):
         strength = constants.wind_strength(
@@ -228,22 +250,20 @@ def compose_wind_text(wind_by_hour: dict) -> str:
         elif strength == constants.MODERATE:
             moderate.append(hour)
 
-    if not strong and not moderate:
-        return ""
-
-    speeds = [r.speed for r in wind_by_hour.values() if r.speed is not None]
-    gusts = [r.gust for r in wind_by_hour.values() if r.gust is not None]
-    peak = f"up to {max(speeds):g} m/s" if speeds else ""
-    # if gusts:
-    #     peak += f", gusts {max(gusts):g} m/s"
-
-    text = ""
+    items = []
     if strong:
-        text += f'🌬️ Strong wind at {format_hours(strong)}.\n'
+        items.append(WeatherCondition(kind="wind", emoji="\U0001f32c\ufe0f",
+                               text=f"Strong wind at {format_hours(strong)}."))
     if moderate:
-        text += f'💨 Moderate wind at {format_hours(moderate)}.\n'
-    return text.rstrip()
-# + f"Peak {peak}." if peak else text.rstrip()
+        items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
+                               text=f"Moderate wind at {format_hours(moderate)}."))
+    return items
+
+
+def compose_wind_text(wind_by_hour: dict) -> str:
+    return "\n".join(
+        f'{item["emoji"]} {item["text"]}' for item in wind_conditions(wind_by_hour)
+    )
 
 
 def format_hours(hours) -> str:
@@ -268,24 +288,42 @@ def format_hour(hour) -> str:
 def format_temperature(value) -> str:
     return "no data" if value is None else f"{value} °C"
 
+def precipitation_conditions(
+    highprcpt, potentialprcpt, window_probability, window_hours, precipitation
+) -> list["WeatherCondition"]:
+    name = precipitation["name"]
+    active, inactive = precipitation["emoji_active"], precipitation["emoji_inactive"]
+
+    items = []
+    if highprcpt:
+        items.append(WeatherCondition(
+            kind="rain", emoji=active,
+            text=f"High potential for {name} at {format_hours(sorted(highprcpt))}"))
+    if potentialprcpt:
+        items.append(WeatherCondition(
+            kind="rain", emoji=active,
+            text=f"Possible {name} at {format_hours(sorted(potentialprcpt))}."))
+    if items:
+        return items
+
+    if window_probability is None:
+        return [WeatherCondition(kind="rain", emoji=inactive, text=f"No {name} in sight!")]
+
+    span = f" {format_hours(window_hours)}" if window_hours else ""
+    return [WeatherCondition(
+        kind="rain", emoji=active,
+        text=f"Potential for {name}{span} ({round(window_probability)}% chance)")]
+
+
 def compose_precipitation_text(
     highprcpt, potentialprcpt, window_probability, window_hours, precipitation
-):
-    text = ''
-    if highprcpt:
-        text += f'High potential for {precipitation["name"]} at {format_hours(sorted(highprcpt))} {precipitation["emoji_active"]}\n'
-    if potentialprcpt:
-        text += f'Possible {precipitation["name"]} at {format_hours(sorted(potentialprcpt))}.\n'
-    if not highprcpt and not potentialprcpt:
-        if window_probability is None:
-            text += f'No {precipitation["name"]} in sight! {precipitation["emoji_inactive"]}\n'
-        else:
-            span = f' {format_hours(window_hours)}' if window_hours else ''
-            text += (
-                f'{precipitation["emoji_active"]} Potential for {precipitation["name"]}{span} '
-                f'({round(window_probability)}% chance)\n'
-            )
-    return text
+) -> str:
+    return "\n".join(
+        f'{item["emoji"]} {item["text"]}'
+        for item in precipitation_conditions(
+            highprcpt, potentialprcpt, window_probability, window_hours, precipitation
+        )
+    )
 
 
 def get_greeting(current_hour: int = None):
@@ -303,8 +341,8 @@ def get_greeting(current_hour: int = None):
             [
                 "Good afternoon!",
                 "Has your day been good to you so far?",
-                "Enjoying the weather?"
-                "Well hello there!"
+                "Enjoying the weather?",
+                "Well hello there!",
             ],
         ),
         (
@@ -324,7 +362,7 @@ def get_greeting(current_hour: int = None):
                 "😪",
                 "🦉",
                 "Still up?",
-                "It's way past <b>my</b> bedtime!"
+                "It's way past <b>my</b> bedtime!",
                 "It's a bit late, but sure...",
             ],
         ),
@@ -408,16 +446,19 @@ def compare_two_forecasts(g_previous_forecast: dict, g_current_forecast: dict) -
     return now_sunny_at
 
 
-def compose_sunny_text(sunny_times: dict[time, float]) -> str:
+def sunny_conditions(sunny_times: dict[time, float]) -> list["WeatherCondition"]:
     if not sunny_times:
-        return 'No sunny times 😔'
-    else:
-        # current_sunny_times = filter(lambda sun_time : datetime.now().time() < sun_time, sunny_times.keys())
-        current_sunny_times = sunny_times.keys()
-        if current_sunny_times:
-            return f'🌞 Expect sun at {format_hours(sorted(sunny_times))}'
-        else:
-            return "No more expected sunny times today. ☁"
+        return [WeatherCondition(kind="sun", emoji="😔", text="No sunny times")]
+    return [WeatherCondition(
+        kind="sun", emoji="🌞",
+        text=f"Expect sun at {format_hours(sorted(sunny_times))}",
+    )]
+
+
+def compose_sunny_text(sunny_times: dict[time, float]) -> str:
+    return "\n".join(
+        f'{item["emoji"]} {item["text"]}' for item in sunny_conditions(sunny_times)
+    )
 
 
 def calculate_if_sunny(json_data) -> bool:
@@ -429,10 +470,9 @@ def calculate_if_sunny(json_data) -> bool:
 
 def precipitation_type(avg_temps: dict[str, dict[str, float]]) -> Precipitation:
     avg_temp = [
-        float(value)
-        for inner in avg_temps.values()
-        for value in inner.values()
-        if value is not None
+        float(period["avg_temperature"])
+        for period in avg_temps.values()
+        if period.get("avg_temperature") is not None
     ]
     if not avg_temp:
         return {"name": "precipitation", "emoji_active": "🌧️", "emoji_inactive": "🌂"}

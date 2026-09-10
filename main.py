@@ -1,6 +1,7 @@
 #Single entry for the Telegram bot and the web app
 import asyncio
 import logging
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,6 +14,7 @@ import app_config
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=app_config.log_level,
+    stream=sys.stdout,
 )
 log = logging.getLogger(__name__)
 

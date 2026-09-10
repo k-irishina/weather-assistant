@@ -90,6 +90,59 @@ async function changeArea(areaId) {
   }
 }
 
+function temperatureList(temperatures) {
+  const list = document.createElement('ul');
+  list.className = 'temps';
+
+  for (const period of Object.values(temperatures || {})) {
+    const row = document.createElement('li');
+
+    if (period.icon) {
+      const img = document.createElement('img');
+      img.src = period.icon;
+      img.width = 40;
+      img.height = 40;
+      img.alt = '';
+      row.append(img);
+    }
+
+    const label = document.createElement('span');
+    label.className = 'temp-label';
+    label.textContent = period.label;
+
+    const value = document.createElement('span');
+    value.className = 'temp-value';
+    value.textContent = period.temperature === null
+      ? 'no data'
+      : `${period.temperature} °C`;
+
+    row.append(label, value);
+    list.append(row);
+  }
+  return list;
+}
+
+function conditionList(items) {
+  const list = document.createElement('ul');
+  list.className = 'conditions';
+
+  for (const item of items || []) {
+    const row = document.createElement('li');
+    row.dataset.kind = item.kind;
+
+    const mark = document.createElement('span');
+    mark.className = 'condition-mark';
+    mark.textContent = item.emoji;
+
+    const text = document.createElement('span');
+    text.textContent = item.text;
+
+    row.append(mark, text);
+    list.append(row);
+  }
+  return list;
+}
+
 async function loadForecast() {
   try {
     const url = selectedArea === null
@@ -100,9 +153,19 @@ async function loadForecast() {
     const data = await res.json();
 
     els.place.textContent = `${data.area} · 🌅 ${data.sunrise}, 🌇 ${data.sunset}`;
-    const pre = document.createElement('pre');
-    pre.textContent = data.text.trim();
-    els.forecast.replaceChildren(pre);
+
+    const day = new Date(`${data.day}T12:00:00`).toLocaleDateString(undefined, {
+      weekday: 'long', day: 'numeric', month: 'long',
+    });
+    const heading = document.createElement('p');
+    heading.className = 'forecast-day';
+    heading.textContent = day;
+
+    els.forecast.replaceChildren(
+      heading,
+      temperatureList(data.temperatures),
+      conditionList(data.conditions),
+    );
   } catch (err) {
     els.place.textContent = '';
     els.forecast.textContent = `Could not load the forecast (${err.message}).`;
