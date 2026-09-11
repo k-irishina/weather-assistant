@@ -56,14 +56,16 @@ body.glitter-mode::before {
   opacity: .45;
 }
 
+/* same pink as --accent below, kept literal since color-mix needs a plain
+   color and this also carries its own alpha for the translucency */
 body.glitter-mode .card,
 body.glitter-mode select,
 body.glitter-mode .icon-button {
-  background: color-mix(in srgb, var(--card) 80%, transparent);
+  background: color-mix(in srgb, var(--card) 75%, rgb(196 106 148 / 55%) 25%);
 }
 
 body.glitter-mode {
-  --accent: #ff3fa4;
+  --accent: #c46a94;
 }
 
 body.glitter-mode #glitter-toggle[aria-pressed="true"] {
