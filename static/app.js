@@ -8,7 +8,6 @@ const els = {
   rainUpdated: document.getElementById('rain-updated'),
   rainBars: document.getElementById('rain-bars'),
   rainTicks: document.getElementById('rain-ticks'),
-  rainTable: document.getElementById('rain-table'),
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
   iosHelp: document.getElementById('ios-help'),
@@ -226,7 +225,7 @@ function scheduleNearTermForecastPoll() {
 
 function renderRainStrip(data) {
   els.rainSummary.textContent = data.summary;
-  els.rainUpdated.textContent = `Radar for ${data.area}, updated ${data.updated_at}.`;
+  els.rainUpdated.textContent = `Updated ${data.updated_at}.`;
   const scale = Math.max(data.peak_rate, data.scale_floor);
 
   els.rainBars.replaceChildren(
@@ -253,24 +252,6 @@ function renderRainStrip(data) {
       return span;
     })
   );
-
-  const wet = steps.filter((step) => step.level !== 'dry');
-  els.rainTable.replaceChildren(
-    ...wet.map((step) => rainRow(step.time, `${step.rate.toFixed(1)} mm/h`))
-  );
-  if (!wet.length) {
-    els.rainTable.replaceChildren(rainRow('No rain in the window.'));
-  }
-}
-
-function rainRow(...cells) {
-  const row = document.createElement('tr');
-  for (const text of cells) {
-    const cell = document.createElement('td');
-    cell.textContent = text;
-    row.append(cell);
-  }
-  return row;
 }
 
 function isIOS() {
