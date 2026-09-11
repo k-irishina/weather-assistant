@@ -142,6 +142,13 @@ function conditionList(items) {
   return list;
 }
 
+function isToday(date) {
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+}
+
 async function loadForecast() {
   try {
     const url = selectedArea === null
@@ -153,12 +160,13 @@ async function loadForecast() {
 
     els.place.textContent = `${data.area} · 🌅 ${data.sunrise}, 🌇 ${data.sunset}`;
 
-    const day = new Date(`${data.day}T12:00:00`).toLocaleDateString(undefined, {
+    const forecastDate = new Date(`${data.day}T12:00:00`);
+    const dayLabel = forecastDate.toLocaleDateString(undefined, {
       weekday: 'long', day: 'numeric', month: 'long',
     });
     const heading = document.createElement('p');
     heading.className = 'forecast-day';
-    heading.textContent = day;
+    heading.textContent = isToday(forecastDate) ? dayLabel : `Tomorrow, ${dayLabel}`;
 
     els.forecast.replaceChildren(
       heading,

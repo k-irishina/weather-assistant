@@ -15,6 +15,12 @@ STEP_MINUTES = 5
 
 COVERED_REGIONS = frozenset({area.OSLO})
 
+RAIN_DESCRIPTIONS = {
+    "light": "light rain",
+    "moderate": "moderate rain",
+    "heavy": "heavy rain",
+}
+
 
 class RainStep(NamedTuple):
     time: datetime  # UTC
@@ -151,12 +157,12 @@ def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
         return ""
 
     period = periods[0]
-    peak = peak_rate(period)
+    description = RAIN_DESCRIPTIONS[level_of(peak_rate(period))]
 
     if period[0] is series.steps[0]:
-        opening = "Raining now"
+        opening = f"{description.capitalize()} now"
     else:
-        opening = f"Rain from about {local_hhmm(period[0].time, timezone)}"
+        opening = f"{description.capitalize()} from about {local_hhmm(period[0].time, timezone)}"
 
     if period[-1] is series.steps[-1]:
         closing = "continuing past the two-hour radar window"
@@ -164,7 +170,7 @@ def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
         ends = period[-1].time + timedelta(minutes=STEP_MINUTES)
         closing = f"easing around {local_hhmm(ends, timezone)}"
 
-    return f"{opening}, {closing}. Heaviest {peak:g} mm/h."
+    return f"{opening}, {closing}."
 
 
 def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
