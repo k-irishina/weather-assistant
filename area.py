@@ -26,10 +26,12 @@ class Area:
 # broad areas, f.ex Asker and Fornebu is still considered Oslo
 OSLO = Region(region_id=101, timezone=ZoneInfo("Europe/Oslo"))
 RIGA = Region(region_id=102, timezone=ZoneInfo("Europe/Riga"))
+ROGALAND = Region(region_id=103, timezone=ZoneInfo("Europe/Oslo"))
 
 areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO), 
           2: Area(59.9549, 11.0622, 2, 'Lillestrøm', OSLO),
           3: Area(56.96619506296, 24.134153506848776, 3, 'Riga - Centre', RIGA),
           4: Area(59.8731, 10.8089, 4, 'Oslo - Lambertseter', OSLO),
+          5: Area(58.9594, 5.7333, 5, 'Stavanger', ROGALAND),
           6: Area(59.960171729794176, 10.787701743038276, 6, 'Oslo - Kjelsås', OSLO)}
 

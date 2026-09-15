@@ -29,6 +29,7 @@ class ForecastReport(TypedDict):
     local_now: datetime
     # none when the report is for the next day
     from_hour: Optional[time]
+    show_tomorrow: bool
     temperatures: dict
     uv_index: float
     sunrise_sunset: db_connector.SunriseTimes
@@ -41,15 +42,12 @@ class ForecastReport(TypedDict):
     wind_by_hour: dict[time, db_connector.WindReading]
 
 
-def forecast_for_area(area_obj: area.Area) -> ForecastReport:
+def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport:
     rcf.fetch_forecast_for_area_id(area_obj.id)
 
-    # if later in the day, provide tomorrow's forecast
     local_now = area_obj.region.now()
-    if local_now.time() > time(18):
-        forecast_day = local_now.date() + timedelta(days=1)
-    else:
-        forecast_day = local_now.date()
+    forecast_day = local_now.date() if day == "today" else local_now.date() + timedelta(days=1)
+    tomorrow_available = local_now.time() >= time(18)
 
     # analysed values
     avg_temperatures = db_connector.select_related_temperatures(area_obj, forecast_day)
@@ -83,6 +81,7 @@ def forecast_for_area(area_obj: area.Area) -> ForecastReport:
         forecast_day=forecast_day,
         local_now=local_now,
         from_hour=from_hour,
+        show_tomorrow=tomorrow_available,
         temperatures=avg_temperatures,
         uv_index=uv_index,
         sunrise_sunset=sunrise_sunset,

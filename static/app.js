@@ -142,43 +142,62 @@ function conditionList(items) {
   return list;
 }
 
-function isToday(date) {
-  const now = new Date();
-  return date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-}
+let forecastDay = 'today';
 
-async function loadForecast() {
+async function loadForecast(day = 'today') {
+  els.forecast.setAttribute('aria-busy', 'true');
   try {
-    const url = selectedArea === null
-      ? '/api/forecast'
-      : `/api/forecast?area=${selectedArea}`;
-    const res = await fetch(url);
+    const params = new URLSearchParams();
+    if (selectedArea !== null) params.set('area', selectedArea);
+    if (day === 'tomorrow') params.set('day', 'tomorrow');
+    const query = params.toString();
+    const res = await fetch(query ? `/api/forecast?${query}` : '/api/forecast');
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
+    forecastDay = day;
 
     els.place.textContent = `${data.area} · 🌅 ${data.sunrise}, 🌇 ${data.sunset}`;
 
-    const forecastDate = new Date(`${data.day}T12:00:00`);
-    const dayLabel = forecastDate.toLocaleDateString(undefined, {
+    const dayLabel = new Date(`${data.day}T12:00:00`).toLocaleDateString(undefined, {
       weekday: 'long', day: 'numeric', month: 'long',
     });
     const heading = document.createElement('p');
     heading.className = 'forecast-day';
-    heading.textContent = isToday(forecastDate) ? dayLabel : `Tomorrow, ${dayLabel}`;
+    heading.textContent = day === 'tomorrow' ? `Tomorrow, ${dayLabel}` : dayLabel;
 
+    const headingRow = document.createElement('div');
+    headingRow.className = 'forecast-day-row';
+    headingRow.append(heading);
+
+    if (day === 'today' && data.tomorrow_available) {
+      headingRow.append(dayFlipButton('Tomorrow ›', 'tomorrow'));
+    } else if (day === 'tomorrow') {
+      headingRow.append(dayFlipButton('‹ Today', 'today'));
+    }
+
+    els.forecast.classList.remove('page-flip');
+    void els.forecast.offsetWidth;
     els.forecast.replaceChildren(
-      heading,
+      headingRow,
       temperatureList(data.temperatures),
       conditionList(data.conditions),
     );
+    els.forecast.classList.add('page-flip');
   } catch (err) {
     els.place.textContent = '';
     els.forecast.textContent = `Could not load the forecast (${err.message}).`;
   } finally {
     els.forecast.setAttribute('aria-busy', 'false');
   }
+}
+
+function dayFlipButton(label, targetDay) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'day-flip';
+  button.textContent = label;
+  button.onclick = () => loadForecast(targetDay);
+  return button;
 }
 
 const POLLING_REGION_TIME_ZONE = 'Europe/Oslo';

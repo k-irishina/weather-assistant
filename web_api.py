@@ -4,6 +4,7 @@ The page is the same assistant as the Telegram bot, for people who don't use
 Telegram.
 """
 import logging
+import math
 from pathlib import Path
 from datetime import time
 from typing import Optional
@@ -68,6 +69,10 @@ def _number(value) -> Optional[float]:
     return None if value is None else float(value)
 
 
+def _ceil(value) -> Optional[int]:
+    return None if value is None else math.ceil(float(value))
+
+
 WEATHER_ICON_DIR = Path(__file__).resolve().parent / "static" / "icons" / "weather-icons"
 
 
@@ -85,7 +90,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     temperatures = {
         key: {
             "label": label,
-            "temperature": _number(report["temperatures"][key]["avg_temperature"]),
+            "temperature": _ceil(report["temperatures"][key]["avg_temperature"]),
             "symbol_code": report["temperatures"][key].get("symbol_code"),
             "icon": _symbol_icon(report["temperatures"][key].get("symbol_code")),
         }
@@ -111,6 +116,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     return {
         "area": report["area_name"],
         "day": report["forecast_day"].isoformat(),
+        "tomorrow_available": report["show_tomorrow"],
         "generated_at": report["local_now"].isoformat(),
         "greeting": greeting,
         "temperatures": temperatures,
@@ -138,8 +144,10 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
 
 
 @router.get("/forecast")
-def get_forecast(area: Optional[int] = None) -> dict:
-    return forecast_payload(assistant.forecast_for_area(resolve_area(area)))
+def get_forecast(area: Optional[int] = None, day: str = "today") -> dict:
+    if day not in ("today", "tomorrow"):
+        raise HTTPException(status_code=400, detail="day must be 'today' or 'tomorrow'.")
+    return forecast_payload(assistant.forecast_for_area(resolve_area(area), day=day))
 
 
 @router.get("/near-term-forecast")
