@@ -147,14 +147,14 @@ Forecast for {day_text}, {report["area_name"]}:
 """
 
 
-def conditions(report: ForecastReport) -> list["WeatherCondition"]:
+def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list["WeatherCondition"]:
     items = sunny_conditions(report["sunny_times"])
     items += precipitation_conditions(
         report["precipitation_high"], report["precipitation_possible"],
         report["precipitation_window"], report["precipitation_window_hours"],
         report["precipitation"],
     )
-    items += wind_conditions(report["wind_by_hour"])
+    items += wind_conditions(report["wind_by_hour"], min_moderate_wind_hours)
     if report["uv_index"] is not None:
         items.append(WeatherCondition(
             kind="uv", emoji="☀️",
@@ -178,7 +178,8 @@ def format_forecast_text_short(report: ForecastReport) -> str:
     lines = [f"{temp_part} {compact_precipitation_text(report)}"]
 
     if report["sunny_times"]:
-        lines.append(f"🌞 {format_hours(sorted(report['sunny_times']))}")
+        sunny_hours = bridge_gaps(sorted(report["sunny_times"]), constants.max_bridge_gap_hours)
+        lines.append(f"🌞 {format_hours(sunny_hours)}")
 
     windy_hours = sorted({
         hour for hour, reading in report["wind_by_hour"].items()
@@ -186,6 +187,7 @@ def format_forecast_text_short(report: ForecastReport) -> str:
         in (constants.MODERATE, constants.STRONG)
     })
     if windy_hours:
+        windy_hours = bridge_gaps(windy_hours, constants.max_bridge_gap_hours)
         lines.append(f"💨 {format_hours(windy_hours)}")
 
     return "\n".join(lines)
@@ -199,10 +201,12 @@ def compact_precipitation_text(report: ForecastReport) -> str:
     precipitation = report["precipitation"]
     hours = sorted(set(report["precipitation_high"]) | set(report["precipitation_possible"]))
     if hours:
+        hours = bridge_gaps(hours, constants.max_bridge_gap_hours)
         return f'{precipitation["emoji_active"]} {precipitation["name"]} {format_hours(hours)}'
     if report["precipitation_window_hours"]:
+        window_hours = bridge_gaps(report["precipitation_window_hours"], constants.max_bridge_gap_hours)
         return (f'{precipitation["emoji_active"]} maybe {precipitation["name"]} '
-                f'{format_hours(report["precipitation_window_hours"])}')
+                f'{format_hours(window_hours)}')
     return f'{precipitation["emoji_inactive"]} no {precipitation["name"]}'
 
 
@@ -238,7 +242,7 @@ def from_hour_onwards(by_hour: dict, cutoff: Optional[time]) -> dict:
     return {hour: value for hour, value in by_hour.items() if hour >= cutoff}
 
 
-def wind_conditions(wind_by_hour: dict) -> list["WeatherCondition"]:
+def wind_conditions(wind_by_hour: dict, min_moderate_run_hours: int = 1) -> list["WeatherCondition"]:
     strong, moderate = [], []
     for hour, reading in sorted(wind_by_hour.items()):
         strength = constants.wind_strength(
@@ -249,10 +253,16 @@ def wind_conditions(wind_by_hour: dict) -> list["WeatherCondition"]:
         elif strength == constants.MODERATE:
             moderate.append(hour)
 
+    strong_set, moderate_set = frozenset(strong), frozenset(moderate)
+
     items = []
     if strong:
+        strong = bridge_gaps(strong, constants.max_bridge_gap_hours, blocked=moderate_set)
         items.append(WeatherCondition(kind="wind", emoji="\U0001f32c\ufe0f",
                                text=f"Strong wind at {format_hours(strong)}."))
+
+    moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
+    moderate = significant_hours(moderate, min_moderate_run_hours)
     if moderate:
         items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
                                text=f"Moderate wind at {format_hours(moderate)}."))
@@ -265,19 +275,43 @@ def compose_wind_text(wind_by_hour: dict) -> str:
     )
 
 
-def format_hours(hours) -> str:
+def hour_runs(hours) -> list:
     if not hours:
-        return ""
-    runs = [[hours[0], hours[0]]]
+        return []
+    runs = [[hours[0]]]
     for hour in hours[1:]:
-        if hour.hour == runs[-1][1].hour + 1:
-            runs[-1][1] = hour
+        if hour.hour == runs[-1][-1].hour + 1:
+            runs[-1].append(hour)
         else:
-            runs.append([hour, hour])
+            runs.append([hour])
+    return runs
+
+
+def significant_hours(hours, min_run_hours: int) -> list:
+    return [hour for run in hour_runs(hours) if len(run) >= min_run_hours for hour in run]
+
+
+def bridge_gaps(hours, max_gap_hours: int, blocked=frozenset()) -> list:
+    """Fill gaps of at most max_gap_hours between runs, e.g. [7,8,10] -> [7,8,9,10]."""
+    runs = hour_runs(hours)
+    if len(runs) <= 1:
+        return hours
+
+    merged = list(runs[0])
+    for run in runs[1:]:
+        gap_start, gap_end = merged[-1].hour + 1, run[0].hour
+        gap_hours = [time(h) for h in range(gap_start, gap_end)]
+        if gap_hours and len(gap_hours) <= max_gap_hours and not any(h in blocked for h in gap_hours):
+            merged.extend(gap_hours)
+        merged.extend(run)
+    return merged
+
+
+def format_hours(hours) -> str:
     return ", ".join(
-        format_hour(start) if start == end
-        else f"{format_hour(start)}-{format_hour(end)}"
-        for start, end in runs
+        format_hour(run[0]) if len(run) == 1
+        else f"{format_hour(run[0])}-{format_hour(run[-1])}"
+        for run in hour_runs(hours)
     )
 
 
@@ -293,21 +327,26 @@ def precipitation_conditions(
     name = precipitation["name"]
     active, inactive = precipitation["emoji_active"], precipitation["emoji_inactive"]
 
+    high_set, possible_set = frozenset(highprcpt), frozenset(potentialprcpt)
+
     items = []
     if highprcpt:
+        high = bridge_gaps(sorted(highprcpt), constants.max_bridge_gap_hours, blocked=possible_set)
         items.append(WeatherCondition(
             kind="rain", emoji=active,
-            text=f"High potential for {name} at {format_hours(sorted(highprcpt))}"))
+            text=f"High potential for {name} at {format_hours(high)}"))
     if potentialprcpt:
+        possible = bridge_gaps(sorted(potentialprcpt), constants.max_bridge_gap_hours, blocked=high_set)
         items.append(WeatherCondition(
             kind="rain", emoji=active,
-            text=f"Possible {name} at {format_hours(sorted(potentialprcpt))}."))
+            text=f"Possible {name} at {format_hours(possible)}."))
     if items:
         return items
 
     if window_probability is None:
         return [WeatherCondition(kind="rain", emoji=inactive, text=f"No {name} in sight!")]
 
+    window_hours = bridge_gaps(window_hours, constants.max_bridge_gap_hours)
     span = f" {format_hours(window_hours)}" if window_hours else ""
     return [WeatherCondition(
         kind="rain", emoji=active,
@@ -448,9 +487,10 @@ def compare_two_forecasts(g_previous_forecast: dict, g_current_forecast: dict) -
 def sunny_conditions(sunny_times: dict[time, float]) -> list["WeatherCondition"]:
     if not sunny_times:
         return [WeatherCondition(kind="sun", emoji="😔", text="No sunny times")]
+    hours = bridge_gaps(sorted(sunny_times), constants.max_bridge_gap_hours)
     return [WeatherCondition(
         kind="sun", emoji="🌞",
-        text=f"Expect sun at {format_hours(sorted(sunny_times))}",
+        text=f"Expect sun at {format_hours(hours)}",
     )]
 
 

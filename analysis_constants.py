@@ -19,6 +19,10 @@ possible_hour_probability = min_precipitation_probability / 2
 moderate_wind_speed = 5.0
 strong_wind_speed = 8.0
 
+min_significant_moderate_wind_run_hours = 4
+
+max_bridge_gap_hours = 1
+
 moderate_gust_speed = 6.5
 strong_gust_speed = 9.0
 

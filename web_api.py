@@ -139,7 +139,9 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
             "window_hours": [_hour(hour) for hour in report["precipitation_window_hours"]],
         },
         "wind": wind,
-        "conditions": assistant.conditions(report),
+        "conditions": assistant.conditions(
+            report, min_moderate_wind_hours=constants.min_significant_moderate_wind_run_hours
+        ),
     }
 
 
