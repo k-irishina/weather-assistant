@@ -14,8 +14,7 @@ const els = {
   areaSelect: document.getElementById('area-select'),
   areaNote: document.getElementById('area-note'),
   testButton: document.getElementById('test-button'),
-  rainOptIn: document.getElementById('rain-opt-in'),
-  rainToggle: document.getElementById('rain-alerts-toggle'),
+  rainButton: document.getElementById('rain-button'),
   glitterToggle: document.getElementById('glitter-toggle'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
@@ -346,7 +345,16 @@ function showUnsubscribed() {
   els.status.textContent = 'Off — turn them on for a morning forecast and sun updates.';
   setButton('Enable notifications', subscribe);
   els.testButton.hidden = true;
-  els.rainOptIn.hidden = true;
+  els.rainButton.hidden = true;
+}
+
+function renderRainButton(enabled) {
+  els.rainButton.hidden = false;
+  els.rainButton.textContent = enabled
+    ? 'Rain notifications are on'
+    : 'Rain notifications are off';
+  els.rainButton.classList.toggle('secondary', enabled);
+  els.rainButton.onclick = () => saveRainAlerts(!enabled);
 }
 
 async function showSubscriptionOptions() {
@@ -363,9 +371,7 @@ async function showSubscriptionOptions() {
 
     const { is_admin: isAdmin, rain_alerts: rainAlerts } = await res.json();
 
-    els.rainOptIn.hidden = false;
-    els.rainToggle.checked = rainAlerts;
-    els.rainToggle.onchange = () => saveRainAlerts(els.rainToggle.checked);
+    renderRainButton(rainAlerts);
 
     if (!isAdmin) return;
     els.testButton.hidden = false;
@@ -378,7 +384,7 @@ async function showSubscriptionOptions() {
 }
 
 async function saveRainAlerts(enabled) {
-  els.rainToggle.disabled = true;
+  els.rainButton.disabled = true;
   try {
     const subscription = await registration.pushManager.getSubscription();
     const res = await fetch('/api/rain-alerts', {
@@ -387,11 +393,11 @@ async function saveRainAlerts(enabled) {
       body: JSON.stringify({ endpoint: subscription.endpoint, enabled }),
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
+    renderRainButton(enabled);
   } catch (err) {
-    els.rainToggle.checked = !enabled;
     els.areaNote.textContent = `Could not save that: ${err.message}`;
   } finally {
-    els.rainToggle.disabled = false;
+    els.rainButton.disabled = false;
   }
 }
 
