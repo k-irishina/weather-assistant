@@ -361,9 +361,14 @@ def store_city_sunset_sunrise_times(
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
+                "DELETE FROM sunrise WHERE region_id = %s;",
+                (region_id,)
+            )
+            
+            cur.execute(
                 """
                 INSERT INTO sunrise(sunrise_time, sunset_time, for_date, region_id)
-                VALUES(%s, %s, %s, %s)
+                VALUES(%s, %s, %s, %s);
                 """,
                 (sunrise, sunset, date, region_id),
             )
