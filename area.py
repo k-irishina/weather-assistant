@@ -33,5 +33,6 @@ areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO),
           3: Area(56.96619506296, 24.134153506848776, 3, 'Riga - Centre', RIGA),
           4: Area(59.8731, 10.8089, 4, 'Oslo - Lambertseter', OSLO),
           5: Area(58.9594, 5.7333, 5, 'Stavanger', ROGALAND),
-          6: Area(59.960171729794176, 10.787701743038276, 6, 'Oslo - Kjelsås', OSLO)}
+          6: Area(59.960171729794176, 10.787701743038276, 6, 'Oslo - Kjelsås', OSLO),
+          7: Area(59.92362, 10.74004, 7, 'Oslo - St.Hanshaugen', OSLO),}
 
