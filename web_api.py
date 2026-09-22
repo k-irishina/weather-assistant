@@ -223,8 +223,9 @@ def unsubscribe(body: Unsubscribe) -> dict:
 
 @router.post("/me")
 def whoami(body: Unsubscribe) -> dict:
-    # enables the test push button
     subscription = db.find_web_subscription(body.endpoint)
+    if subscription is not None:
+        db.mark_web_subscription_seen(body.endpoint)
     return {
         "known": subscription is not None,
         "is_admin": bool(subscription and subscription.is_admin),

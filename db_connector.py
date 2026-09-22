@@ -557,6 +557,16 @@ def find_web_subscription(endpoint: str) -> Optional[WebSubscription]:
             return WebSubscription(*row) if row else None
 
 
+def mark_web_subscription_seen(endpoint: str) -> None:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE web_subscriptions SET last_seen = now() WHERE endpoint = %s""",
+                (endpoint,),
+            )
+        conn.commit()
+
+
 def delete_web_subscription(endpoint: str) -> None:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
