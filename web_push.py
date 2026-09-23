@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+from datetime import time
 from typing import Optional
 
 from pywebpush import WebPushException, webpush
@@ -99,8 +100,11 @@ def subscribed_areas() -> list[area.Area]:
     ]
 
 
-async def push_morning_forecast() -> None:
+async def push_morning_forecast(at: time) -> None:
     for area_obj in subscribed_areas():
+        subscriptions = db.morning_subscriptions_for_area(area_obj, at)
+        if not subscriptions:
+            continue
         try:
             report = assistant.forecast_for_area(area_obj)
             text = assistant.format_forecast_text_short(report)
@@ -108,12 +112,20 @@ async def push_morning_forecast() -> None:
             log.exception("Could not build forecast for %s", area_obj.display_name)
             continue
         await asyncio.to_thread(
-            send_to_area,
-            area_obj,
+            send_to_subscriptions,
+            subscriptions,
             f"Forecast for {area_obj.display_name}",
             text.strip(),
             "morning-forecast",
         )
+        log.info("Morning forecast %s for %s", at.strftime("%H:%M"), area_obj.display_name)
+
+
+def send_to_subscriptions(subscriptions, title: str, body: str, tag: str) -> int:
+    return sum(
+        send_to_subscription(subscription, title, body, tag)
+        for subscription in subscriptions
+    )
 
 
 def send_to_rain_subscribers(area_obj: area.Area, title: str, body: str) -> int:

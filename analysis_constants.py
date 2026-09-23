@@ -1,3 +1,4 @@
+from datetime import time
 from typing import Optional
 
 default_area_id = 1
@@ -34,10 +35,15 @@ min_wet_steps = 2
 
 
 # push notifications
-quiet_hours_start = 23
-quiet_hours_end = 6
+morning_push_times = (time(6, 0), time(6, 30), time(7, 15))
+# web default and Telegram bot
+default_morning_push_at = time(7, 15)
+sun_update_at = time(12, 15)
 
-rain_alert_cooldown_minutes = 60
+quiet_hours_start = 23
+quiet_hours_end = 8
+
+rain_alert_cooldown_minutes = 40
 
 CALM = "calm"
 MODERATE = "moderate"

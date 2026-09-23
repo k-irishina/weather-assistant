@@ -508,6 +508,7 @@ class WebSubscription(NamedTuple):
     is_admin: bool = False
     area: Optional[int] = None
     rain_alerts: bool = False
+    morning_push_at: Optional[time] = None
 
 
 def save_web_subscription(endpoint: str, p256dh: str, auth: str, area: area.Area):
@@ -542,12 +543,42 @@ def web_subscriptions_for_area(area: area.Area) -> list[WebSubscription]:
             return [WebSubscription(*row) for row in cur.fetchall()]
 
 
+def morning_subscriptions_for_area(area: area.Area, at: time) -> list[WebSubscription]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT endpoint, p256dh, auth, is_admin
+                FROM web_subscriptions
+                WHERE area = %s AND morning_push_at = %s
+                """,
+                (area.id, at),
+            )
+            return [WebSubscription(*row) for row in cur.fetchall()]
+
+
+def set_morning_push_at(endpoint: str, at: time) -> bool:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE web_subscriptions
+                SET morning_push_at = %s, last_seen = now()
+                WHERE endpoint = %s
+                """,
+                (at, endpoint),
+            )
+            updated = cur.rowcount
+        conn.commit()
+    return updated > 0
+
+
 def find_web_subscription(endpoint: str) -> Optional[WebSubscription]:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT endpoint, p256dh, auth, is_admin, area, rain_alerts
+                SELECT endpoint, p256dh, auth, is_admin, area, rain_alerts, morning_push_at
                 FROM web_subscriptions
                 WHERE endpoint = %s
                 """,

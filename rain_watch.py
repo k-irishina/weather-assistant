@@ -9,7 +9,6 @@ from telegram import Bot
 import analysis_constants as constants
 import app_config
 import area
-import daily_updates
 import db_connector as db
 import near_term_forecast
 import scheduler
@@ -19,9 +18,9 @@ log = logging.getLogger(__name__)
 
 TEST_USERS = app_config.users["test-users"]
 
-# Heavy enough to matter no matter what the morning said.
+# Heavy enough to matter no matter what the morning forecast was
 HEAVY = "heavy"
-# Rain the morning forecast did not call for.
+# Rain the morning forecast did not call for
 UNFORESEEN = "unforeseen"
 
 
@@ -77,10 +76,6 @@ FIRST_CHECK_AFTER_SECONDS = 60
 
 
 def in_quiet_hours(local_now: datetime) -> bool:
-    """Whether we are inside the window where nobody wants to be woken up.
-
-    The window wraps midnight, so it is a union rather than a range.
-    """
     hour = local_now.hour
     return hour >= constants.quiet_hours_start or hour < constants.quiet_hours_end
 
@@ -88,13 +83,11 @@ def in_quiet_hours(local_now: datetime) -> bool:
 def baseline_cutoff(area_obj: area.Area, local_now: datetime) -> datetime:
     """The instant whose forecast the reader would have seen.
 
-    After the morning push, that is the run the push was built from. Before it,
-    it is simply the newest run there is - which is what the page would have
-    shown them if they had opened it. Either way we can say what they were told,
-    so the surprise rule stays live around the clock.
+    After the last morning push, that is the run it was built from, the earlier
+    pushes are at most one MET update older, which rarely changes a rain call.
     """
     sent_at = datetime.combine(
-        local_now.date(), daily_updates.MORNING_FORECAST_AT
+        local_now.date(), max(constants.morning_push_times), tzinfo=local_now.tzinfo
     )
     return local_now if local_now < sent_at else sent_at
 
@@ -115,7 +108,7 @@ def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
     return title, body
 
 
-def check_area(area_obj: area.Area) -> Optional[RainAlert]:
+def check_area_for_rain(area_obj: area.Area) -> Optional[RainAlert]:
     """Check for unpredicted rain and alert if so"""
     series = near_term_forecast.fetch_and_store(area_obj)
     if series is None:
@@ -166,7 +159,7 @@ async def watch(bot: Optional[Bot]) -> None:
     for area_obj in WATCHED_AREAS:
         try:
             # blocking network and database work, off the event loop
-            alert = await asyncio.to_thread(check_area, area_obj)
+            alert = await asyncio.to_thread(check_area_for_rain, area_obj)
         except Exception:
             log.exception("Rain watch failed for %s", area_obj.display_name)
             continue

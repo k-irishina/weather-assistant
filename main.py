@@ -18,6 +18,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+import jobs
 import tg_bot
 import web_api
 
@@ -33,25 +34,23 @@ class RevalidatingStaticFiles(StaticFiles):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bot = tg_bot.build_application()
-
-
-    await bot.initialize()
-    await bot.updater.start_polling(**tg_bot.POLLING_KWARGS)
-    await bot.start()
-    background_tasks = await tg_bot.start_background_jobs(bot)
+    application = tg_bot.build_application()
+    await application.initialize()
+    await application.updater.start_polling(**tg_bot.POLLING_KWARGS)
+    await application.start()
+    background_tasks = jobs.start(application.bot)
     log.info("Telegram bot polling; web app ready")
 
-    app.state.bot = bot
+    app.state.bot = application
     try:
         yield
     finally:
         for task in background_tasks:
             task.cancel()
         await asyncio.gather(*background_tasks, return_exceptions=True)
-        await bot.updater.stop()
-        await bot.stop()
-        await bot.shutdown()
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
         log.info("Telegram bot stopped")
 
 

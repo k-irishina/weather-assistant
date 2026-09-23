@@ -40,7 +40,8 @@ CREATE TABLE web_subscriptions(
              created_at timestamptz NOT NULL DEFAULT now(),
              last_seen timestamptz,
              is_admin boolean NOT NULL DEFAULT false,
-             rain_alerts boolean NOT NULL DEFAULT false);
+             rain_alerts boolean NOT NULL DEFAULT false,
+             morning_push_at time NOT NULL DEFAULT '07:15');
 
 
 CREATE TABLE near_term_forecast(

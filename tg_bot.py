@@ -13,8 +13,7 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 import app_config
 import area
 import assistant
-import daily_updates
-import rain_watch
+import jobs
 
 LIST_OF_ADMINS = app_config.users["admin-users"]
 
@@ -114,15 +113,13 @@ POLLING_KWARGS = dict(
 )
 
 
-async def start_background_jobs(application: Application) -> list:
-    tasks = daily_updates.schedule(application.bot) + rain_watch.schedule(application.bot)
-    application.bot_data["background_tasks"] = tasks
-    return tasks
+async def start_jobs_when_standalone(application: Application) -> None:
+    jobs.start(application.bot)
 
 
 def build_application() -> Application:
     token = app_config.telegram['token']
-    application = Application.builder().token(token).post_init(start_background_jobs).build()
+    application = Application.builder().token(token).post_init(start_jobs_when_standalone).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))

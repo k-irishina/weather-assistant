@@ -57,6 +57,11 @@ class RainAlertChange(BaseModel):
     enabled: bool
 
 
+class MorningTimeChange(BaseModel):
+    endpoint: str = Field(min_length=1)
+    time: str
+
+
 class Unsubscribe(BaseModel):
     endpoint: str = Field(min_length=1)
 
@@ -214,6 +219,19 @@ def change_rain_alerts(body: RainAlertChange) -> dict:
     return {"status": "updated", "rain_alerts": body.enabled}
 
 
+@router.post("/morning-time")
+def change_morning_time(body: MorningTimeChange) -> dict:
+    chosen = next(
+        (at for at in constants.morning_push_times if _hour(at) == body.time), None
+    )
+    if chosen is None:
+        raise HTTPException(status_code=400, detail=f"Unsupported time {body.time!r}.")
+    if not db.set_morning_push_at(body.endpoint, chosen):
+        raise HTTPException(status_code=404, detail="No such subscription.")
+    log.info("Web subscription morning push moved to %s", body.time)
+    return {"status": "updated", "morning_push_at": body.time}
+
+
 @router.post("/unsubscribe")
 def unsubscribe(body: Unsubscribe) -> dict:
     db.delete_web_subscription(body.endpoint)
@@ -231,6 +249,12 @@ def whoami(body: Unsubscribe) -> dict:
         "is_admin": bool(subscription and subscription.is_admin),
         "area": subscription.area if subscription else None,
         "rain_alerts": bool(subscription and subscription.rain_alerts),
+        "morning_push_at": _hour(
+            subscription.morning_push_at
+            if subscription and subscription.morning_push_at
+            else constants.default_morning_push_at
+        ),
+        "morning_push_options": [_hour(at) for at in constants.morning_push_times],
     }
 
 

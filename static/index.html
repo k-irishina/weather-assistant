@@ -34,7 +34,7 @@
       <p>Average temp, rain, sun, wind and UV index for the day. Simple and easy.</p>
       <p>If you turn on notifications, you will get push notifications for the chosen location:</p>
       <ul>
-        <li><strong>Morning forecast</strong> — every day at 07:15</li>
+        <li><strong>Morning forecast</strong> — every day</li>
         <li><strong>Sunshine update</strong> — at 12:15 if the sun
           outlook for the day has changed - so you can use it as you should 🌞</li>
         <li><strong>Rain updates*</strong> — you will be notified if your morning forecast did not indicate rain or if strong rain is incoming.</li>
@@ -73,6 +73,10 @@
       <button id="push-button" hidden></button>
       <button id="test-button" class="secondary" hidden>Test notification</button>
       <button id="rain-button" hidden></button>
+      <div id="morning-time" class="setting" hidden>
+        <label for="morning-time-select">Morning forecast at <span class="new-badge">New!</span></label>
+        <select id="morning-time-select"></select>
+      </div>
       <div id="ios-help" hidden>
         <p>On iPhone and iPad, notifications only work once this page is on your
           Home Screen:</p>

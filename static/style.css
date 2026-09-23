@@ -345,3 +345,27 @@ select {
 .conditions li[data-kind="uv"] {
   color: var(--muted);
 }
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: .75rem;
+}
+
+.setting select {
+  font: inherit;
+}
+
+.new-badge {
+  display: inline-block;
+  margin-left: .35rem;
+  padding: 0 .45rem;
+  border-radius: 999px;
+  background: var(--sun);
+  color: #1b2a41;
+  font-size: .75rem;
+  font-weight: 700;
+  vertical-align: middle;
+}

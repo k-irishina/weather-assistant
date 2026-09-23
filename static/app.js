@@ -15,6 +15,8 @@ const els = {
   areaNote: document.getElementById('area-note'),
   testButton: document.getElementById('test-button'),
   rainButton: document.getElementById('rain-button'),
+  morningTime: document.getElementById('morning-time'),
+  morningTimeSelect: document.getElementById('morning-time-select'),
   glitterToggle: document.getElementById('glitter-toggle'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
@@ -346,6 +348,7 @@ function showUnsubscribed() {
   setButton('Enable notifications', subscribe);
   els.testButton.hidden = true;
   els.rainButton.hidden = true;
+  els.morningTime.hidden = true;
 }
 
 function renderRainButton(enabled) {
@@ -369,9 +372,15 @@ async function showSubscriptionOptions() {
     });
     if (!res.ok) return;
 
-    const { is_admin: isAdmin, rain_alerts: rainAlerts } = await res.json();
+    const {
+      is_admin: isAdmin,
+      rain_alerts: rainAlerts,
+      morning_push_at: morningPushAt,
+      morning_push_options: morningPushOptions,
+    } = await res.json();
 
     renderRainButton(rainAlerts);
+    renderMorningTime(morningPushAt, morningPushOptions);
 
     if (!isAdmin) return;
     els.testButton.hidden = false;
@@ -380,6 +389,33 @@ async function showSubscriptionOptions() {
     els.testButton.onclick = sendTestPush;
   } catch (err) {
     console.warn('Could not check subscription options:', err);
+  }
+}
+
+function renderMorningTime(selected, options) {
+  els.morningTimeSelect.replaceChildren(
+    ...options.map((value) => new Option(value, value, false, value === selected))
+  );
+  els.morningTimeSelect.onchange = () => saveMorningTime(els.morningTimeSelect.value, selected);
+  els.morningTime.hidden = false;
+}
+
+async function saveMorningTime(time, previous) {
+  els.morningTimeSelect.disabled = true;
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    const res = await fetch('/api/morning-time', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint, time }),
+    });
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+    els.morningTimeSelect.onchange = () => saveMorningTime(els.morningTimeSelect.value, time);
+  } catch (err) {
+    els.morningTimeSelect.value = previous;
+    els.areaNote.textContent = `Could not save that: ${err.message}`;
+  } finally {
+    els.morningTimeSelect.disabled = false;
   }
 }
 
