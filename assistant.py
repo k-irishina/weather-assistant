@@ -205,7 +205,7 @@ def compact_precipitation_text(report: ForecastReport) -> str:
         return f'{precipitation["emoji_active"]} {precipitation["name"]} {format_hours(hours)}'
     if report["precipitation_window_hours"]:
         window_hours = bridge_gaps(report["precipitation_window_hours"], constants.max_bridge_gap_hours)
-        return (f'{precipitation["emoji_active"]} maybe {precipitation["name"]} '
+        return (f'{precipitation["emoji_active"]} might {precipitation["name"]} '
                 f'{format_hours(window_hours)}')
     return f'{precipitation["emoji_inactive"]} no {precipitation["name"]}'
 

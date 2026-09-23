@@ -96,12 +96,12 @@ def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
     timezone = area_obj.region.timezone
     when = near_term_forecast.local_hhmm(alert.starts_at, timezone)
     if alert.kind == HEAVY:
-        title = "Heavy rain on the radar"
+        title = "Heavy rain incoming"
         body = (f"{alert.peak_rate:g} mm/h from about {when} in "
                 f"{area_obj.display_name}, for around {alert.minutes} minutes.")
     else:
         title = "Rain the forecast missed"
-        body = (f"The radar sees rain from about {when} in "
+        body = (f"Rain from about {when} in "
                 f"{area_obj.display_name} ({alert.peak_rate:g} mm/h, around "
                 f"{alert.minutes} minutes). This morning's forecast did not "
                 "call for it.")
