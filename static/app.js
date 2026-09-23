@@ -316,6 +316,7 @@ function inAppBrowser() {
   if (/MessengerForiOS|Orca-Android/.test(ua)) return 'Messenger';
   if (/FBAN|FBAV|FB_IAB/.test(ua)) return 'Facebook';
   if (/LinkedInApp/.test(ua)) return 'LinkedIn';
+  if (/Snapchat/.test(ua)) return 'Snapchat';
   return null;
 }
 
