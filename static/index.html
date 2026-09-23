@@ -80,15 +80,18 @@
       <p class="muted" id="push-status">Checking…</p>
       <button id="push-button" hidden></button>
       <button id="test-button" class="secondary" hidden>Test notification</button>
-      <button id="rain-button" hidden></button>
       <div class="settings">
         <div id="morning-time" class="setting" hidden>
-          <label for="morning-time-select">Morning forecast at <span class="new-badge">New!</span></label>
+          <label for="morning-time-select"><span class="new-badge">New!</span>Morning forecast at</label>
           <select id="morning-time-select"></select>
         </div>
         <div id="weekend-morning" class="setting" hidden>
           <label for="weekend-morning-toggle">On weekends too?</label>
           <input id="weekend-morning-toggle" class="switch" type="checkbox" role="switch">
+        </div>
+        <div id="rain-alerts" class="setting" hidden>
+          <label for="rain-alerts-toggle">Rain notifications</label>
+          <input id="rain-alerts-toggle" class="switch" type="checkbox" role="switch">
         </div>
       </div>
       <div id="ios-help" hidden>
