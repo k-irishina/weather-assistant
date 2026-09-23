@@ -681,18 +681,19 @@ def insert_near_term_forecast_run(
     return stored > 0
 
 
-def latest_near_term_forecast_run(area: area.Area):
+def latest_near_term_forecast_run(area: area.Area, as_of: Optional[datetime] = None):
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT created_at, radar_coverage, series
                 FROM near_term_forecast
-                WHERE area = %s
+                WHERE area = %(area)s
+                  AND (%(as_of)s::timestamptz IS NULL OR created_at <= %(as_of)s)
                 ORDER BY created_at DESC
                 LIMIT 1
                 """,
-                (area.id,),
+                {"area": area.id, "as_of": as_of},
             )
             return cur.fetchone()
 

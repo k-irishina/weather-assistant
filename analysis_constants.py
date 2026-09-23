@@ -43,6 +43,12 @@ sun_update_at = time(12, 15)
 quiet_hours_start = 23
 quiet_hours_end = 8
 
+radar_pause_start = 23
+radar_pause_end = 5
+
+radar_max_age_minutes = 25
+radar_trusted_dry_minutes = 90
+
 rain_alert_cooldown_minutes = 40
 
 CALM = "calm"

@@ -75,9 +75,18 @@ CHECK_INTERVAL_SECONDS = 10 * 60
 FIRST_CHECK_AFTER_SECONDS = 60
 
 
+def _in_overnight_window(local_now: datetime, start: int, end: int) -> bool:
+    return local_now.hour >= start or local_now.hour < end
+
+
 def in_quiet_hours(local_now: datetime) -> bool:
-    hour = local_now.hour
-    return hour >= constants.quiet_hours_start or hour < constants.quiet_hours_end
+    return _in_overnight_window(
+        local_now, constants.quiet_hours_start, constants.quiet_hours_end)
+
+
+def in_radar_pause(local_now: datetime) -> bool:
+    return _in_overnight_window(
+        local_now, constants.radar_pause_start, constants.radar_pause_end)
 
 
 def baseline_cutoff(area_obj: area.Area, local_now: datetime) -> datetime:
@@ -90,6 +99,18 @@ def baseline_cutoff(area_obj: area.Area, local_now: datetime) -> datetime:
         local_now.date(), max(constants.morning_push_times), tzinfo=local_now.tzinfo
     )
     return local_now if local_now < sent_at else sent_at
+
+
+def told_with_radar(
+    area_obj: area.Area, baseline: Optional[dict[datetime, float]], cutoff: datetime
+) -> Optional[dict[datetime, float]]:
+    """The morning forecast corrected by the radar"""
+    if baseline is None:
+        return None
+    radar = near_term_forecast.latest_series(area_obj, as_of=cutoff)
+    if radar is None or not near_term_forecast.is_fresh(radar, cutoff):
+        return baseline
+    return near_term_forecast.apply_radar(baseline, near_term_forecast.radar_hours(radar))
 
 
 def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
@@ -110,19 +131,22 @@ def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
 
 def check_area_for_rain(area_obj: area.Area) -> Optional[RainAlert]:
     """Check for unpredicted rain and alert if so"""
+    local_now = area_obj.region.now()
+    if in_radar_pause(local_now):
+        return None
+
     series = near_term_forecast.fetch_and_store(area_obj)
     if series is None:
         return None
 
-    local_now = area_obj.region.now()
     if in_quiet_hours(local_now):
         log.debug("%s is in quiet hours, not sending",
                   area_obj.display_name)
         return None
 
-    baseline = db.morning_baseline_precipitation(
-        area_obj, baseline_cutoff(area_obj, local_now)
-    )
+    cutoff = baseline_cutoff(area_obj, local_now)
+    baseline = told_with_radar(
+        area_obj, db.morning_baseline_precipitation(area_obj, cutoff), cutoff)
 
     alert = decide(series, baseline)
     if alert is None:

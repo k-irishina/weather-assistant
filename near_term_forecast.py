@@ -128,10 +128,12 @@ def serialise_steps(steps: list[RainStep]) -> str:
     return json.dumps([{"time": s.time.isoformat(), "rate": s.rate} for s in steps])
 
 
-def latest_series(area_obj: area.Area) -> Optional[NearTermSeries]:
+def latest_series(
+    area_obj: area.Area, as_of: Optional[datetime] = None
+) -> Optional[NearTermSeries]:
     import db_connector as db
 
-    row = db.latest_near_term_forecast_run(area_obj)
+    row = db.latest_near_term_forecast_run(area_obj, as_of)
     if row is None:
         return None
 
@@ -200,3 +202,53 @@ def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
             for step in series.steps
         ],
     }
+
+
+class RadarHours(NamedTuple):
+    wet: frozenset[datetime]
+    dry: frozenset[datetime]
+
+
+def _hour_start(moment: datetime) -> datetime:
+    return moment.replace(minute=0, second=0, microsecond=0)
+
+
+def is_fresh(series: NearTermSeries, at: datetime) -> bool:
+    return at - series.created_at <= timedelta(minutes=constants.radar_max_age_minutes)
+
+
+def radar_hours(series: NearTermSeries) -> RadarHours:
+    """Hours the radar says will be wet, and hours it is confident stay dry.
+    Wet uses the rain-alert rule and counts anywhere in the window. Dry needs the
+    radar to reach the end of the hour, and that end to fall within
+    radar_trusted_dry_minutes of the run. An hour already under way when the run
+    was made counts as covered, since only the rest of it still matters.
+    """
+    if not series.steps:
+        return RadarHours(frozenset(), frozenset())
+
+    wet = {
+        _hour_start(step.time)
+        for run in rain_periods(series.steps, constants.rain_starting_rate)
+        if len(run) >= constants.min_wet_steps
+        for step in run
+    }
+
+    step = timedelta(minutes=STEP_MINUTES)
+    first, last = series.steps[0].time, series.steps[-1].time
+    trusted_until = series.created_at + timedelta(minutes=constants.radar_trusted_dry_minutes)
+    dry = set()
+    hour = _hour_start(first)
+    while hour + timedelta(hours=1) - step <= last:
+        covered_from_start = first <= hour or hour <= series.created_at
+        if hour not in wet and covered_from_start and hour + timedelta(hours=1) <= trusted_until:
+            dry.add(hour)
+        hour += timedelta(hours=1)
+    return RadarHours(frozenset(wet), frozenset(dry))
+
+
+def apply_radar(probabilities: dict[datetime, float], hours: RadarHours) -> dict[datetime, float]:
+    adjusted = dict(probabilities)
+    adjusted.update({hour: 0.0 for hour in hours.dry})
+    adjusted.update({hour: 100.0 for hour in hours.wet})
+    return adjusted

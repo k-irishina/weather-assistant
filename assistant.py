@@ -1,12 +1,13 @@
 import logging as log
 import random
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from statistics import mean
 from typing import NamedTuple, Optional, TypedDict
 
 import analysis_constants as constants
 import area
 import db_connector
+import near_term_forecast
 import retrieve_complete_forecast as rcf
 
 
@@ -61,6 +62,8 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     precipitation_pct_by_hour = db_connector.precipitation_probabilities(
         area_obj, forecast_day, "next_1_hours"
     )
+    if day == "today":
+        precipitation_pct_by_hour = with_radar(area_obj, forecast_day, precipitation_pct_by_hour)
     window_pct_by_hour = db_connector.precipitation_probabilities(
         area_obj, forecast_day, "next_6_hours"
     )
@@ -93,6 +96,23 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         precipitation_window_hours=outlook.window_hours,
         wind_by_hour=wind_by_hour,
     )
+
+
+def with_radar(area_obj: area.Area, forecast_day: date, hourly: dict[time, float]) -> dict[time, float]:
+    if not near_term_forecast.is_covered(area_obj):
+        return hourly
+    series = near_term_forecast.latest_series(area_obj)
+    if series is None or not near_term_forecast.is_fresh(series, datetime.now(timezone.utc)):
+        return hourly
+
+    tz = area_obj.region.timezone
+    by_moment = {datetime.combine(forecast_day, hour, tzinfo=tz): p for hour, p in hourly.items()}
+    adjusted = near_term_forecast.apply_radar(by_moment, near_term_forecast.radar_hours(series))
+    return {
+        moment.astimezone(tz).time(): probability
+        for moment, probability in sorted(adjusted.items())
+        if moment.astimezone(tz).date() == forecast_day
+    }
 
 
 class PrecipitationOutlook(NamedTuple):
