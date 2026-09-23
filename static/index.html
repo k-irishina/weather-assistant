@@ -73,16 +73,15 @@
       <button id="push-button" hidden></button>
       <button id="test-button" class="secondary" hidden>Test notification</button>
       <button id="rain-button" hidden></button>
-      <div id="morning-time" class="setting" hidden>
-        <label for="morning-time-select">Morning forecast at <span class="new-badge">New!</span></label>
-        <select id="morning-time-select"></select>
-      </div>
-      <div id="weekend-morning" class="setting" hidden>
-        <label for="weekend-morning-select">Weekend</label>
-        <select id="weekend-morning-select">
-          <option value="on">Same as weekdays</option>
-          <option value="off">No morning forecast</option>
-        </select>
+      <div class="settings">
+        <div id="morning-time" class="setting" hidden>
+          <label for="morning-time-select">Morning forecast at <span class="new-badge">New!</span></label>
+          <select id="morning-time-select"></select>
+        </div>
+        <div id="weekend-morning" class="setting" hidden>
+          <label for="weekend-morning-toggle">Weekend</label>
+          <input id="weekend-morning-toggle" class="switch" type="checkbox" role="switch">
+        </div>
       </div>
       <div id="ios-help" hidden>
         <p>On iPhone and iPad, notifications only work once this page is on your

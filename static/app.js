@@ -18,7 +18,7 @@ const els = {
   morningTime: document.getElementById('morning-time'),
   morningTimeSelect: document.getElementById('morning-time-select'),
   weekendMorning: document.getElementById('weekend-morning'),
-  weekendMorningSelect: document.getElementById('weekend-morning-select'),
+  weekendMorningToggle: document.getElementById('weekend-morning-toggle'),
   glitterToggle: document.getElementById('glitter-toggle'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
@@ -441,14 +441,13 @@ async function saveMorningTime(time, previous) {
 }
 
 function renderWeekendMorning(enabled) {
-  els.weekendMorningSelect.value = enabled ? 'on' : 'off';
-  els.weekendMorningSelect.onchange = () =>
-    saveWeekendMorning(els.weekendMorningSelect.value === 'on');
+  els.weekendMorningToggle.checked = enabled;
+  els.weekendMorningToggle.onchange = () => saveWeekendMorning(els.weekendMorningToggle.checked);
   els.weekendMorning.hidden = false;
 }
 
 async function saveWeekendMorning(enabled) {
-  els.weekendMorningSelect.disabled = true;
+  els.weekendMorningToggle.disabled = true;
   try {
     const subscription = await registration.pushManager.getSubscription();
     const res = await fetch('/api/weekend-morning', {
@@ -458,10 +457,10 @@ async function saveWeekendMorning(enabled) {
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
   } catch (err) {
-    els.weekendMorningSelect.value = enabled ? 'off' : 'on';
+    els.weekendMorningToggle.checked = !enabled;
     els.areaNote.textContent = `Could not save that: ${err.message}`;
   } finally {
-    els.weekendMorningSelect.disabled = false;
+    els.weekendMorningToggle.disabled = false;
   }
 }
 
@@ -563,10 +562,25 @@ async function unsubscribe() {
   }
 }
 
-els.glitterToggle.onclick = () => {
-  const enabled = !document.body.classList.contains('glitter-mode');
+const GLITTER_KEY = 'weather-assistant-glitter';
+
+function setGlitter(enabled) {
   document.body.classList.toggle('glitter-mode', enabled);
   els.glitterToggle.setAttribute('aria-pressed', String(enabled));
+}
+
+try {
+  setGlitter(localStorage.getItem(GLITTER_KEY) === 'on');
+} catch (err) {
+}
+
+els.glitterToggle.onclick = () => {
+  const enabled = !document.body.classList.contains('glitter-mode');
+  setGlitter(enabled);
+  try {
+    localStorage.setItem(GLITTER_KEY, enabled ? 'on' : 'off');
+  } catch (err) {
+  }
 };
 
 els.aboutToggle.onclick = () => {
