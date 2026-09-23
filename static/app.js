@@ -20,6 +20,11 @@ const els = {
   weekendMorning: document.getElementById('weekend-morning'),
   weekendMorningToggle: document.getElementById('weekend-morning-toggle'),
   glitterToggle: document.getElementById('glitter-toggle'),
+  inApp: document.getElementById('in-app'),
+  inAppText: document.getElementById('in-app-text'),
+  inAppOpen: document.getElementById('in-app-open'),
+  inAppCopy: document.getElementById('in-app-copy'),
+  inAppNote: document.getElementById('in-app-note'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
 };
@@ -304,6 +309,64 @@ function shareStepHtml() {
     + '<span class="key">•••</span> next to the address bar first';
 }
 
+
+function inAppBrowser() {
+  const ua = navigator.userAgent;
+  if (/Instagram/.test(ua)) return 'Instagram';
+  if (/MessengerForiOS|Orca-Android/.test(ua)) return 'Messenger';
+  if (/FBAN|FBAV|FB_IAB/.test(ua)) return 'Facebook';
+  if (/LinkedInApp/.test(ua)) return 'LinkedIn';
+  return null;
+}
+
+function isAndroid() {
+  return /Android/.test(navigator.userAgent);
+}
+
+
+// Undocumented schemes that hand the page to the real browser; they work in some
+// apps and not others (Meta's are unreliable), so the menu route stays primary.
+function escapeUrl() {
+  const { host, pathname, search } = window.location;
+  if (isIOS()) return `x-safari-https://${host}${pathname}${search}`;
+  if (isAndroid()) {
+    return `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;end`;
+  }
+  return null;
+}
+
+async function copyLink() {
+  const url = window.location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    els.inAppNote.textContent =
+      `Copied. Open your browser, paste it into the address bar and enjoy!`;
+  } catch (err) {
+    els.inAppNote.textContent = `Copy this link and open it in the browser: ${url}`;
+  }
+}
+
+function showInAppBanner() {
+  const app = inAppBrowser();
+  if (!app) return;
+
+  els.inAppText.innerHTML = `Weather Asst. is best enjoyed in a full browser. `
+    + 'Tap <span class="key">•••</span> at the top, then '
+    + '<strong>Open in (browser)</strong>';
+
+  const url = escapeUrl();
+  if (url) {
+    els.inAppOpen.textContent = `Open in browser`;
+    els.inAppOpen.onclick = () => {
+      els.inAppNote.textContent = 'If nothing happens, use the ••• menu or Copy link.';
+      window.location.href = url;
+    };
+    els.inAppOpen.hidden = false;
+  }
+  els.inAppCopy.onclick = copyLink;
+  els.inApp.hidden = false;
+}
+
 function isInstalled() {
   return window.navigator.standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches;
@@ -329,6 +392,12 @@ async function setUpPush() {
     els.status.textContent =
       'Coming soon — a morning forecast and a notification if sun pops up. ' +
       'For now, @WhisperWeatherBot on Telegram does this.';
+    return;
+  }
+
+  if (inAppBrowser()) {
+    els.status.textContent =
+      'Notifications need your normal browser. See the box at the top of the page.';
     return;
   }
 
@@ -588,6 +657,8 @@ els.aboutToggle.onclick = () => {
   els.about.hidden = !open;
   els.aboutToggle.setAttribute('aria-expanded', String(open));
 };
+
+showInAppBanner();
 
 setUpAreas()
   .catch(() => { /* if can't load areas we don't crash the page*/ })
