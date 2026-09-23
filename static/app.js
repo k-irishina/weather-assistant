@@ -17,6 +17,8 @@ const els = {
   rainButton: document.getElementById('rain-button'),
   morningTime: document.getElementById('morning-time'),
   morningTimeSelect: document.getElementById('morning-time-select'),
+  weekendMorning: document.getElementById('weekend-morning'),
+  weekendMorningSelect: document.getElementById('weekend-morning-select'),
   glitterToggle: document.getElementById('glitter-toggle'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
@@ -287,6 +289,21 @@ function isIOS() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+const SHARE_ICON = '<svg class="inline-icon" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M12 3v12M8 7l4-4 4 4M8 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-2"/></svg>';
+const SHARE = `${SHARE_ICON} <strong>Share</strong>`;
+
+function shareStepHtml() {
+  const ua = navigator.userAgent;
+  if (/CriOS/.test(ua)) return `Tap ${SHARE} at the top right, in the address bar`;
+  if (/FxiOS|EdgiOS/.test(ua)) return `Open the browser menu and tap ${SHARE}`;
+  if (/iPad/.test(ua) || navigator.platform === 'MacIntel') {
+    return `Tap ${SHARE} at the top right of the screen`;
+  }
+  return `Tap ${SHARE} at the bottom of the screen. Don't see it? Tap `
+    + '<span class="key">•••</span> next to the address bar first';
+}
+
 function isInstalled() {
   return window.navigator.standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches;
@@ -318,6 +335,7 @@ async function setUpPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     if (isIOS() && !isInstalled()) {
       els.status.textContent = 'Almost there..';
+      document.getElementById('ios-share-step').innerHTML = shareStepHtml();
       els.iosHelp.hidden = false;
     } else {
       els.status.textContent = 'This browser does not support push notifications.';
@@ -349,6 +367,7 @@ function showUnsubscribed() {
   els.testButton.hidden = true;
   els.rainButton.hidden = true;
   els.morningTime.hidden = true;
+  els.weekendMorning.hidden = true;
 }
 
 function renderRainButton(enabled) {
@@ -377,10 +396,12 @@ async function showSubscriptionOptions() {
       rain_alerts: rainAlerts,
       morning_push_at: morningPushAt,
       morning_push_options: morningPushOptions,
+      weekend_morning_push: weekendMorningPush,
     } = await res.json();
 
     renderRainButton(rainAlerts);
     renderMorningTime(morningPushAt, morningPushOptions);
+    renderWeekendMorning(weekendMorningPush);
 
     if (!isAdmin) return;
     els.testButton.hidden = false;
@@ -416,6 +437,31 @@ async function saveMorningTime(time, previous) {
     els.areaNote.textContent = `Could not save that: ${err.message}`;
   } finally {
     els.morningTimeSelect.disabled = false;
+  }
+}
+
+function renderWeekendMorning(enabled) {
+  els.weekendMorningSelect.value = enabled ? 'on' : 'off';
+  els.weekendMorningSelect.onchange = () =>
+    saveWeekendMorning(els.weekendMorningSelect.value === 'on');
+  els.weekendMorning.hidden = false;
+}
+
+async function saveWeekendMorning(enabled) {
+  els.weekendMorningSelect.disabled = true;
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    const res = await fetch('/api/weekend-morning', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint, enabled }),
+    });
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+  } catch (err) {
+    els.weekendMorningSelect.value = enabled ? 'off' : 'on';
+    els.areaNote.textContent = `Could not save that: ${err.message}`;
+  } finally {
+    els.weekendMorningSelect.disabled = false;
   }
 }
 

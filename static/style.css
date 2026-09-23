@@ -369,3 +369,22 @@ select {
   font-weight: 700;
   vertical-align: middle;
 }
+
+.inline-icon {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.key {
+  padding: 0 .35rem;
+  border: 1px solid var(--line);
+  border-radius: .35rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}

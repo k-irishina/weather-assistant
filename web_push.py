@@ -102,7 +102,8 @@ def subscribed_areas() -> list[area.Area]:
 
 async def push_morning_forecast(at: time) -> None:
     for area_obj in subscribed_areas():
-        subscriptions = db.morning_subscriptions_for_area(area_obj, at)
+        weekend = area_obj.region.today().weekday() >= 5
+        subscriptions = db.morning_subscriptions_for_area(area_obj, at, weekend)
         if not subscriptions:
             continue
         try:

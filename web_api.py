@@ -62,6 +62,11 @@ class MorningTimeChange(BaseModel):
     time: str
 
 
+class WeekendMorningChange(BaseModel):
+    endpoint: str = Field(min_length=1)
+    enabled: bool
+
+
 class Unsubscribe(BaseModel):
     endpoint: str = Field(min_length=1)
 
@@ -232,6 +237,15 @@ def change_morning_time(body: MorningTimeChange) -> dict:
     return {"status": "updated", "morning_push_at": body.time}
 
 
+@router.post("/weekend-morning")
+def change_weekend_morning(body: WeekendMorningChange) -> dict:
+    if not db.set_weekend_morning_push(body.endpoint, body.enabled):
+        raise HTTPException(status_code=404, detail="No such subscription.")
+    log.info("Weekend morning push %s for a web subscription",
+             "enabled" if body.enabled else "disabled")
+    return {"status": "updated", "weekend_morning_push": body.enabled}
+
+
 @router.post("/unsubscribe")
 def unsubscribe(body: Unsubscribe) -> dict:
     db.delete_web_subscription(body.endpoint)
@@ -255,6 +269,7 @@ def whoami(body: Unsubscribe) -> dict:
             else constants.default_morning_push_at
         ),
         "morning_push_options": [_hour(at) for at in constants.morning_push_times],
+        "weekend_morning_push": subscription.weekend_morning_push if subscription else True,
     }
 
 

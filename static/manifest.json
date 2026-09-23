@@ -1,14 +1,24 @@
 {
   "name": "Weather Assistant",
-  "short_name": "WeatherASS",
-  "description": "Forecast with a reminder for sunshine",
+  "short_name": "WeatherAsst.",
+  "description": "Accurate and up-to-date short-term forecast",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#1b2a41",
   "theme_color": "#1b2a41",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ]
 }

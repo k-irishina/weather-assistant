@@ -77,13 +77,20 @@
         <label for="morning-time-select">Morning forecast at <span class="new-badge">New!</span></label>
         <select id="morning-time-select"></select>
       </div>
+      <div id="weekend-morning" class="setting" hidden>
+        <label for="weekend-morning-select">Weekend</label>
+        <select id="weekend-morning-select">
+          <option value="on">Same as weekdays</option>
+          <option value="off">No morning forecast</option>
+        </select>
+      </div>
       <div id="ios-help" hidden>
         <p>On iPhone and iPad, notifications only work once this page is on your
           Home Screen:</p>
         <ol>
-          <li>Tap the <strong>Share</strong> button below</li>
+          <li id="ios-share-step">Tap <strong>Share</strong> in your browser</li>
           <li>Choose <strong>Add to Home Screen</strong></li>
-          <li>Open it from the new icon, then come back here</li>
+          <li>Open it from the new icon and enjoy!</li>
         </ol>
       </div>
     </section>
