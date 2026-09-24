@@ -95,8 +95,8 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
 
 def fetch_sunset_sunrise_for_area(user_area: area.Area) -> db.SunriseTimes:
     date_today = user_area.region.today()
-        # we don't require high accuracy here, so 10 days is acceptable
-    sunrise_sunset_stored = db.fetch_sunrise_sunset(user_area, date_today, 10)
+        # we don't require high accuracy here, so 5 days is acceptable
+    sunrise_sunset_stored = db.fetch_sunrise_sunset(user_area, date_today, 5)
     if sunrise_sunset_stored:
         log.info("returning stored sun data")
         return sunrise_sunset_stored
