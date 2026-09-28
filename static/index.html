@@ -79,21 +79,31 @@
       <h2>Notifications</h2>
       <p class="muted" id="push-status">Checking…</p>
       <button id="push-button" hidden></button>
-      <button id="test-button" class="secondary" hidden>Test notification</button>
-      <div class="settings">
-        <div id="morning-time" class="setting" hidden>
-          <label for="morning-time-select"><span class="new-badge">New!</span>Morning forecast at</label>
-          <select id="morning-time-select"></select>
+      <details id="push-settings" hidden>
+        <summary>
+          <span id="push-summary">🔔 On</span>
+          <span class="summary-action">Settings</span>
+        </summary>
+        <div class="settings">
+          <div class="setting">
+            <label for="push-toggle">Notifications</label>
+            <input id="push-toggle" class="switch" type="checkbox" role="switch" checked>
+          </div>
+          <div id="morning-time" class="setting" hidden>
+            <label for="morning-time-select">Morning forecast at</label>
+            <select id="morning-time-select"></select>
+          </div>
+          <div id="weekend-morning" class="setting" hidden>
+            <label for="weekend-morning-toggle">On weekends too?</label>
+            <input id="weekend-morning-toggle" class="switch" type="checkbox" role="switch">
+          </div>
+          <div id="rain-alerts" class="setting" hidden>
+            <label for="rain-alerts-toggle">Rain notifications</label>
+            <input id="rain-alerts-toggle" class="switch" type="checkbox" role="switch">
+          </div>
         </div>
-        <div id="weekend-morning" class="setting" hidden>
-          <label for="weekend-morning-toggle">On weekends too?</label>
-          <input id="weekend-morning-toggle" class="switch" type="checkbox" role="switch">
-        </div>
-        <div id="rain-alerts" class="setting" hidden>
-          <label for="rain-alerts-toggle">Rain notifications</label>
-          <input id="rain-alerts-toggle" class="switch" type="checkbox" role="switch">
-        </div>
-      </div>
+        <button id="test-button" class="secondary" hidden>Test notification</button>
+      </details>
       <div id="ios-help" hidden>
         <p>On iPhone and iPad, notifications only work once this page is on your
           Home Screen:</p>

@@ -10,6 +10,9 @@ const els = {
   rainTicks: document.getElementById('rain-ticks'),
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
+  pushSettings: document.getElementById('push-settings'),
+  pushSummary: document.getElementById('push-summary'),
+  pushToggle: document.getElementById('push-toggle'),
   iosHelp: document.getElementById('ios-help'),
   areaSelect: document.getElementById('area-select'),
   areaNote: document.getElementById('area-note'),
@@ -428,14 +431,33 @@ async function setUpPush() {
 }
 
 function showSubscribed() {
-  els.status.textContent = 'On — you will get the morning forecast and sun updates.';
-  setButton('Turn off notifications', unsubscribe, true);
+  els.status.hidden = true;
+  els.button.hidden = true;
+  els.pushToggle.checked = true;
+  els.pushToggle.onchange = () => {
+    if (!els.pushToggle.checked) unsubscribe();
+  };
+  updatePushSummary();
+  els.pushSettings.hidden = false;
   showSubscriptionOptions();
 }
 
+function updatePushSummary() {
+  const parts = ['🔔 On'];
+  if (!els.morningTime.hidden) {
+    const days = els.weekendMorningToggle.checked ? 'every day' : 'on weekdays';
+    parts.push(`${els.morningTimeSelect.value} ${days}`);
+  }
+  if (!els.rainAlerts.hidden && els.rainAlertsToggle.checked) parts.push('rain alerts');
+  els.pushSummary.textContent = parts.join(' · ');
+}
+
 function showUnsubscribed() {
+  els.status.hidden = false;
   els.status.textContent = 'Off — turn them on for a morning forecast and sun updates.';
   setButton('Enable notifications', subscribe);
+  els.pushSettings.hidden = true;
+  els.pushSettings.open = false;
   els.testButton.hidden = true;
   els.rainAlerts.hidden = true;
   els.morningTime.hidden = true;
@@ -471,6 +493,7 @@ async function showSubscriptionOptions() {
     renderRainAlerts(rainAlerts);
     renderMorningTime(morningPushAt, morningPushOptions);
     renderWeekendMorning(weekendMorningPush);
+    updatePushSummary();
 
     if (!isAdmin) return;
     els.testButton.hidden = false;
@@ -506,6 +529,7 @@ async function saveMorningTime(time, previous) {
     els.areaNote.textContent = `Could not save that: ${err.message}`;
   } finally {
     els.morningTimeSelect.disabled = false;
+    updatePushSummary();
   }
 }
 
@@ -530,6 +554,7 @@ async function saveWeekendMorning(enabled) {
     els.areaNote.textContent = `Could not save that: ${err.message}`;
   } finally {
     els.weekendMorningToggle.disabled = false;
+    updatePushSummary();
   }
 }
 
@@ -548,6 +573,7 @@ async function saveRainAlerts(enabled) {
     els.areaNote.textContent = `Could not save that: ${err.message}`;
   } finally {
     els.rainAlertsToggle.disabled = false;
+    updatePushSummary();
   }
 }
 
@@ -611,9 +637,10 @@ async function subscribe() {
 
 async function unsubscribe() {
   if (!confirm('Are you sure you want to stop receiving notifications?')) {
+    els.pushToggle.checked = true;
     return;
   }
-  els.button.disabled = true;
+  els.pushToggle.disabled = true;
   try {
     const subscription = await registration.pushManager.getSubscription();
     if (subscription) {
@@ -626,8 +653,11 @@ async function unsubscribe() {
     }
     showUnsubscribed();
   } catch (err) {
+    els.pushToggle.checked = true;
     els.status.textContent = `Could not turn them off: ${err.message}`;
-    els.button.disabled = false;
+    els.status.hidden = false;
+  } finally {
+    els.pushToggle.disabled = false;
   }
 }
 
