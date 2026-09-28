@@ -110,6 +110,7 @@ main {
 header {
   position: relative;
   padding-right: 5.2rem;
+  margin-bottom: 1.25rem;
 }
 
 h1 {
@@ -142,7 +143,7 @@ h2 {
 }
 
 .place {
-  margin: .25rem 0 1.25rem;
+  margin: .25rem 0 0;
   color: var(--ink);
   font-weight: 600;
 }
@@ -327,7 +328,7 @@ select {
   padding: 0;
 }
 
-.temps li {
+.temps > li {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -537,4 +538,83 @@ body.glitter-mode .new-badge {
 
 #test-button {
   margin-top: .75rem;
+}
+
+.temp-period {
+  flex: 1;
+}
+
+.temp-period summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.temp-period summary::-webkit-details-marker {
+  display: none;
+}
+
+/* same chevron as the notification settings pushed to the right edge */
+.temp-period summary::after {
+  content: "";
+  flex: none;
+  width: .45rem;
+  height: .45rem;
+  margin: 0 .25rem .2rem auto;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform .2s ease;
+}
+
+.temp-period[open] summary::after {
+  margin: .2rem .25rem 0 auto;
+  transform: rotate(-135deg);
+}
+
+.temp-hours {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.2rem, 1fr));
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.temp-hours li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.temp-hour {
+  font-size: .75rem;
+  color: var(--muted);
+}
+
+.right-now {
+  margin: .2rem 0 0;
+}
+
+.right-now-label {
+  margin-right: .3rem;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+body.glitter-mode .right-now {
+  text-shadow: 0 0 2px var(--bg), 0 0 5px var(--bg), 0 0 8px var(--bg);
+}
+
+.updated,
+#rain-updated {
+  margin: .5rem 0 0;
+  font-size: .85rem;
 }

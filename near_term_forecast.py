@@ -175,24 +175,26 @@ def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
     return f"{opening}, {closing}."
 
 
-def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
-    if series is None or not series.steps or not is_covered(area_obj):
-        return {"available": False}
 
-    periods = rain_periods(series.steps, constants.rain_starting_rate)
-    if not periods:
-        return {"available": False}
+def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
+    """The rain strip, plus a one-line "now" read of the radar for the page header."""
+    if series is None or not series.steps or not is_covered(area_obj):
+        return {"available": False, "now": None}
 
     timezone = area_obj.region.timezone
+    now = compose_near_rain_text(series, timezone) or "Dry for the next 2 hours."
+    if not rain_periods(series.steps, constants.rain_starting_rate):
+        return {"available": False, "now": now}
+
     return {
         "available": True,
+        "now": now,
         "area": area_obj.display_name,
         "updated_at": local_hhmm(series.created_at, timezone),
         "raining_now": series.steps[0].rate >= constants.rain_starting_rate,
         "peak_rate": peak_rate(series.steps),
         "scale_floor": constants.heavy_rain_rate,
         "total_mm": total_precipitation(series.steps),
-        "summary": compose_near_rain_text(series, timezone),
         "steps": [
             {
                 "time": local_hhmm(step.time, timezone),

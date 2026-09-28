@@ -32,6 +32,8 @@ class ForecastReport(TypedDict):
     from_hour: Optional[time]
     show_tomorrow: bool
     temperatures: dict
+    hourly_temperatures: dict[time, float]
+    forecast_run_at: Optional[datetime]
     uv_index: float
     sunrise_sunset: db_connector.SunriseTimes
     sunny_times: dict[time, float]
@@ -68,13 +70,16 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         area_obj, forecast_day, "next_6_hours"
     )
     uv_index = db_connector.highest_uv_index(area_obj, forecast_day)
+    forecast_run_at = db_connector.latest_forecast_run_at(area_obj)
     wind_by_hour = db_connector.evaluate_wind(area_obj, forecast_day)
+    hourly_temperatures = db_connector.hourly_temperatures(area_obj, forecast_day)
 
     from_hour = current_hour_cutoff(local_now, forecast_day)
     sunny_times = from_hour_onwards(sunny_times, from_hour)
     precipitation_pct_by_hour = from_hour_onwards(precipitation_pct_by_hour, from_hour)
     window_pct_by_hour = from_hour_onwards(window_pct_by_hour, from_hour)
     wind_by_hour = from_hour_onwards(wind_by_hour, from_hour)
+    hourly_temperatures = from_hour_onwards(hourly_temperatures, from_hour)
 
     outlook = classify_precipitation(precipitation_pct_by_hour, window_pct_by_hour)
 
@@ -86,7 +91,9 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         from_hour=from_hour,
         show_tomorrow=tomorrow_available,
         temperatures=avg_temperatures,
+        hourly_temperatures=hourly_temperatures,
         uv_index=uv_index,
+        forecast_run_at=forecast_run_at,
         sunrise_sunset=sunrise_sunset,
         sunny_times=sunny_times,
         precipitation=precipitation_type(avg_temperatures),

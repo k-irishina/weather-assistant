@@ -4,7 +4,8 @@ const els = {
   place: document.getElementById('place'),
   forecast: document.getElementById('forecast'),
   rain: document.getElementById('rain'),
-  rainSummary: document.getElementById('rain-summary'),
+  rightNow: document.getElementById('right-now'),
+  rightNowText: document.getElementById('right-now-text'),
   rainUpdated: document.getElementById('rain-updated'),
   rainBars: document.getElementById('rain-bars'),
   rainTicks: document.getElementById('rain-ticks'),
@@ -107,30 +108,62 @@ function temperatureList(temperatures) {
 
   for (const period of Object.values(temperatures || {})) {
     const row = document.createElement('li');
+    const cells = periodCells(period);
 
-    if (period.icon) {
-      const img = document.createElement('img');
-      img.src = period.icon;
-      img.width = 40;
-      img.height = 40;
-      img.alt = '';
-      row.append(img);
+    if (period.hours && period.hours.length) {
+      const details = document.createElement('details');
+      details.className = 'temp-period';
+      const summary = document.createElement('summary');
+      summary.append(...cells);
+      details.append(summary, hourStrip(period.hours));
+      row.append(details);
+    } else {
+      row.append(...cells);
     }
-
-    const label = document.createElement('span');
-    label.className = 'temp-label';
-    label.textContent = period.label;
-
-    const value = document.createElement('span');
-    value.className = 'temp-value';
-    value.textContent = period.temperature === null
-      ? 'no data'
-      : `${period.temperature} °C`;
-
-    row.append(label, value);
     list.append(row);
   }
   return list;
+}
+
+function periodCells(period) {
+  const cells = [];
+  if (period.icon) {
+    const img = document.createElement('img');
+    img.src = period.icon;
+    img.width = 40;
+    img.height = 40;
+    img.alt = '';
+    cells.push(img);
+  }
+
+  const label = document.createElement('span');
+  label.className = 'temp-label';
+  label.textContent = period.label;
+
+  const value = document.createElement('span');
+  value.className = 'temp-value';
+  value.textContent = period.temperature === null
+    ? 'no data'
+    : `${period.temperature} °C`;
+
+  cells.push(label, value);
+  return cells;
+}
+
+function hourStrip(hours) {
+  const strip = document.createElement('ol');
+  strip.className = 'temp-hours';
+  for (const { hour, temperature } of hours) {
+    const item = document.createElement('li');
+    const time = document.createElement('span');
+    time.className = 'temp-hour';
+    time.textContent = hour;
+    const value = document.createElement('span');
+    value.textContent = temperature === null ? '–' : `${temperature}°`;
+    item.append(time, value);
+    strip.append(item);
+  }
+  return strip;
 }
 
 function conditionList(items) {
@@ -155,6 +188,13 @@ function conditionList(items) {
 }
 
 let forecastDay = 'today';
+
+function updatedLine(time) {
+  const line = document.createElement('p');
+  line.className = 'muted updated';
+  line.textContent = `Updated ${time}`;
+  return line;
+}
 
 async function loadForecast(day = 'today') {
   els.forecast.setAttribute('aria-busy', 'true');
@@ -193,6 +233,7 @@ async function loadForecast(day = 'today') {
       headingRow,
       temperatureList(data.temperatures),
       conditionList(data.conditions),
+      ...(data.updated_at ? [updatedLine(data.updated_at)] : []),
     );
     els.forecast.classList.add('page-flip');
   } catch (err) {
@@ -244,6 +285,7 @@ async function loadNearTermForecast() {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
+    renderRightNow(data.now);
     if (!data.available) {
       els.rain.hidden = true;
       return;
@@ -251,8 +293,14 @@ async function loadNearTermForecast() {
     renderRainStrip(data);
     els.rain.hidden = false;
   } catch (err) {
+    renderRightNow(null);
     els.rain.hidden = true;
   }
+}
+
+function renderRightNow(text) {
+  els.rightNowText.textContent = text || '';
+  els.rightNow.hidden = !text;
 }
 
 function scheduleNearTermForecastPoll() {
@@ -263,7 +311,6 @@ function scheduleNearTermForecastPoll() {
 }
 
 function renderRainStrip(data) {
-  els.rainSummary.textContent = data.summary;
   els.rainUpdated.textContent = `Updated ${data.updated_at}.`;
   const scale = Math.max(data.peak_rate, data.scale_floor);
 

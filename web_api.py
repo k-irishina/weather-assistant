@@ -6,7 +6,7 @@ Telegram.
 import logging
 import math
 from pathlib import Path
-from datetime import time
+from datetime import datetime, time, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -95,16 +95,30 @@ def _symbol_icon(symbol_code: Optional[str]) -> Optional[str]:
     return f"/icons/weather-icons/{symbol_code}.png"
 
 
+FIRST_PERIOD_HOUR = time(6)
+
+
+def _period_hours(report: assistant.ForecastReport, start: time, until: time) -> list[dict]:
+    return [
+        {"hour": _hour(hour), "temperature": _ceil(temperature)}
+        for hour, temperature in sorted(report["hourly_temperatures"].items())
+        if start <= hour < until
+    ]
+
+
 def forecast_payload(report: assistant.ForecastReport) -> dict:
     cutoff = report["from_hour"]
+    periods = assistant.temperature_periods
+    starts = [FIRST_PERIOD_HOUR] + [until for _, _, until in periods[:-1]]
     temperatures = {
         key: {
             "label": label,
             "temperature": _ceil(report["temperatures"][key]["avg_temperature"]),
             "symbol_code": report["temperatures"][key].get("symbol_code"),
             "icon": _symbol_icon(report["temperatures"][key].get("symbol_code")),
+            "hours": _period_hours(report, start, until),
         }
-        for label, key, until in assistant.temperature_periods
+        for start, (label, key, until) in zip(starts, periods)
         if key in report["temperatures"] and (cutoff is None or until > cutoff)
     }
 
@@ -128,6 +142,10 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         "day": report["forecast_day"].isoformat(),
         "tomorrow_available": report["show_tomorrow"],
         "generated_at": report["local_now"].isoformat(),
+        "updated_at": (
+            None if report["forecast_run_at"] is None
+            else report["forecast_run_at"].astimezone(report["local_now"].tzinfo).strftime("%H:%M")
+        ),
         "greeting": greeting,
         "temperatures": temperatures,
         # None when the forecast table has no rows for the day yet
@@ -165,9 +183,11 @@ def get_forecast(area: Optional[int] = None, day: str = "today") -> dict:
 @router.get("/near-term-forecast")
 def get_near_term_forecast(area: Optional[int] = None) -> dict:
     chosen = resolve_area(area)
-    return near_term_forecast.page_payload(
-        near_term_forecast.latest_series(chosen), chosen
-    )
+    series = near_term_forecast.latest_series(chosen)
+    # overnight the radar isn't fetched so the last run can seem super old
+    if series is not None and not near_term_forecast.is_fresh(series, datetime.now(timezone.utc)):
+        series = None
+    return near_term_forecast.page_payload(series, chosen)
 
 
 @router.get("/areas")

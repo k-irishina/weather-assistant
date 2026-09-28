@@ -126,7 +126,7 @@ def select_related_temperatures(area: area.Area, date):
         FROM localized_data
         WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
             AND local_ts::time IN (
-              '06:00:00', '07:00:00', '08:00:00',
+              '06:00:00', '07:00:00', '08:00:00', '09:00:00',
               '12:00:00', '13:00:00', '14:00:00',
               '18:00:00', '19:00:00', '20:00:00'
             )
@@ -139,7 +139,7 @@ def select_related_temperatures(area: area.Area, date):
       )
     SELECT
     CASE
-        WHEN local_ts::time IN ('06:00:00', '07:00:00', '08:00:00') THEN 'morning'
+        WHEN local_ts::time IN ('06:00:00', '07:00:00', '08:00:00', '09:00:00') THEN 'morning'
         WHEN local_ts::time IN ('12:00:00', '13:00:00', '14:00:00') THEN 'midday'
         WHEN local_ts::time IN ('18:00:00', '19:00:00', '20:00:00') THEN 'evening'
     END AS time_period,
@@ -322,6 +322,33 @@ def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:
             }
 
 
+def hourly_temperatures(area: area.Area, date: date) -> dict[time, float]:
+    timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
+    with connpool.connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT (forecast_time AT TIME ZONE %(tz)s)::time,
+                       (forecast_data->>'air_temperature')::numeric
+                FROM forecast_complete
+                WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                  AND area = %(area)s
+                  AND id IN (
+                      SELECT MAX(id)
+                      FROM forecast_complete
+                      WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                        AND area = %(area)s
+                      GROUP BY forecast_time
+                  )
+                  AND forecast_data->>'air_temperature' IS NOT NULL
+                ORDER BY forecast_time
+                """,
+                {"tz": timezone, "day_start": day_start, "day_end": day_end, "area": area.id},
+            )
+            return dict(cursor.fetchall())
+
+
 def highest_uv_index(area: area.Area, date: date):
     timezone = str(area.region.timezone)
     day_start, day_end = local_day_bounds(area, date)
@@ -417,6 +444,23 @@ def log_forecast(created_at, modified, expires, area: area.Area):
                 (created_at, modified, expires, area.id),
             )
             conn.commit()
+
+
+def latest_forecast_run_at(area: area.Area) -> Optional[datetime]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT forecast_created_at
+                FROM forecast_update_log
+                WHERE area = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (area.id,),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
 
 
 def forecast_update_log(area: area.Area) -> Optional[ForecastFetch]:
