@@ -493,7 +493,7 @@ body.glitter-mode .new-badge {
 #push-settings summary {
   cursor: pointer;
   list-style: none;
-  font-weight: 600;
+  color: var(--muted);
 }
 
 #push-settings summary::-webkit-details-marker {

@@ -33,6 +33,8 @@ moderate_rain_rate = 2.5
 heavy_rain_rate = 4.0
 min_wet_steps = 2
 
+min_shown_uv_index = 2.5
+
 
 # push notifications
 morning_push_times = (time(6, 0), time(6, 30), time(7, 15))

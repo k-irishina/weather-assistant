@@ -188,10 +188,11 @@ def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list
         report["precipitation"],
     )
     items += wind_conditions(report["wind_by_hour"], min_moderate_wind_hours)
-    if report["uv_index"] is not None:
+    uv_index = report["uv_index"]
+    if uv_index is not None and float(uv_index) >= constants.min_shown_uv_index:
         items.append(WeatherCondition(
-            kind="uv", emoji="☀️",
-            text=f'Max UV index: {round(report["uv_index"])}',
+            kind="uv", emoji="🔸",
+            text=f'Max UV index: {int(float(uv_index) + 0.5)}',
         ))
     return items
 
