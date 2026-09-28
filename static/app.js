@@ -211,9 +211,9 @@ async function loadForecast(day = 'today') {
     heading.textContent = day === 'tomorrow' ? `Tomorrow, ${dayLabel}` : dayLabel;
     if (data.updated_at) {
       const updated = document.createElement('span');
-      updated.className = 'muted forecast-updated';
+      updated.className = 'muted updated-note';
       updated.textContent = `Updated ${data.updated_at}`;
-      heading.append(' ', updated);
+      heading.append(updated);
     }
 
     const headingRow = document.createElement('div');

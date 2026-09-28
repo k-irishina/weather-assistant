@@ -615,9 +615,8 @@ body.glitter-mode .right-now {
 
 .card-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: .75rem;
   margin-bottom: .5rem;
 }
 
@@ -625,12 +624,8 @@ body.glitter-mode .right-now {
   margin: 0;
 }
 
-#rain-updated {
-  font-size: .85rem;
-}
-
-.forecast-updated {
-  margin-left: .3rem;
+.updated-note {
+  margin-left: .4rem;
   font-size: .85rem;
   font-weight: normal;
   white-space: nowrap;
