@@ -486,10 +486,11 @@ body.glitter-mode .new-badge {
   display: none;
 }
 
+#notifications {
+  position: relative;
+}
+
 #push-settings summary {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
   cursor: pointer;
   list-style: none;
   font-weight: 600;
@@ -499,18 +500,25 @@ body.glitter-mode .new-badge {
   display: none;
 }
 
-#push-summary {
-  flex: 1;
+.summary-part {
+  white-space: nowrap;
 }
 
 .summary-action {
+  position: absolute;
+  top: 1rem;
+  right: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  line-height: 1.5rem;
   color: var(--muted);
   font-size: .85rem;
   font-weight: 600;
 }
 
 /* a chevron that points down when closed and up when open */
-#push-settings summary::after {
+.summary-action::after {
   content: "";
   flex: none;
   width: .5rem;
@@ -522,7 +530,7 @@ body.glitter-mode .new-badge {
   transition: transform .2s ease;
 }
 
-#push-settings[open] summary::after {
+#push-settings[open] .summary-action::after {
   margin: .2rem .2rem 0 0;
   transform: rotate(-135deg);
 }

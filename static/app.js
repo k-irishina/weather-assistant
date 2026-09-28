@@ -449,7 +449,12 @@ function updatePushSummary() {
     parts.push(`${els.morningTimeSelect.value} ${days}`);
   }
   if (!els.rainAlerts.hidden && els.rainAlertsToggle.checked) parts.push('rain alerts');
-  els.pushSummary.textContent = parts.join(' · ');
+  els.pushSummary.replaceChildren(...parts.flatMap((part, index) => {
+    const span = document.createElement('span');
+    span.className = 'summary-part';
+    span.textContent = part;
+    return index === 0 ? [span] : [' · ', span];
+  }));
 }
 
 function showUnsubscribed() {
