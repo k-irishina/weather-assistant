@@ -123,6 +123,10 @@ class PrecipitationOutlook(NamedTuple):
     window_hours: list[time]
 
 
+# each next_6_hours value is the chance of rain in the six hours from its hour
+WINDOW_HOURS = 6
+
+
 def classify_precipitation(hourly: dict, window: dict) -> PrecipitationOutlook:
     named = {
         hour: probability
@@ -138,16 +142,25 @@ def classify_precipitation(hourly: dict, window: dict) -> PrecipitationOutlook:
         possible = [hour for hour in named if hour not in high]
         return PrecipitationOutlook(high, possible, None, [])
 
-    peak_window = max(window.values(), default=0)
-    if peak_window < constants.min_precipitation_probability:
+    # fix the overlap with next day
+    in_day = {
+        hour: probability
+        for hour, probability in window.items()
+        if hour.hour <= 24 - WINDOW_HOURS
+    }
+    if max(in_day.values(), default=0) < constants.min_precipitation_probability:
         return PrecipitationOutlook([], [], None, [])
+    peak_start = max(in_day, key=in_day.get)
 
     span = [
         hour
         for hour, probability in hourly.items()
         if probability >= constants.possible_hour_probability
     ]
-    return PrecipitationOutlook([], [], peak_window, sorted(span))
+    if not span:
+        # the chance is too low, state the window
+        span = [time(h) for h in range(peak_start.hour, peak_start.hour + WINDOW_HOURS)]
+    return PrecipitationOutlook([], [], in_day[peak_start], sorted(span))
 
 
 def format_forecast_text(report: ForecastReport, greeting: Optional[str] = None) -> str:
