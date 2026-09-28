@@ -87,6 +87,8 @@ def level_of(rate: float) -> str:
         return "moderate"
     if rate >= constants.rain_starting_rate:
         return "light"
+    if rate >= constants.drizzle_rate:
+        return "drizzle"
     return "dry"
 
 
@@ -183,7 +185,8 @@ def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
 
     timezone = area_obj.region.timezone
     now = compose_near_rain_text(series, timezone) or "Dry for the next 2 hours."
-    if not rain_periods(series.steps, constants.rain_starting_rate):
+    # the graph shows anything the radar sees, drizzle included
+    if not any(step.rate >= constants.drizzle_rate for step in series.steps):
         return {"available": False, "now": now}
 
     return {

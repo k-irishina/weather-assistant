@@ -6,6 +6,7 @@
   --line: #dde3ea;
   --accent: #1b2a41;
   --sun: #f5b301;
+  --rain-drizzle: #a9c9f2;
   --rain-light: #86b6ef;
   --rain-moderate: #2a78d6;
   --rain-heavy: #104281;
@@ -20,6 +21,7 @@
     --muted: #94a3b8;
     --line: #2b3849;
     --accent: #f5b301;
+    --rain-drizzle: #2e5c93;
     --rain-light: #3987e5;
     --rain-moderate: #6da7ec;
     --rain-heavy: #b7d3f6;
@@ -273,6 +275,7 @@ select {
   background: var(--rain-track);
 }
 
+.rain-bar.rain-drizzle { background: var(--rain-drizzle); }
 .rain-bar.rain-light { background: var(--rain-light); }
 .rain-bar.rain-moderate { background: var(--rain-moderate); }
 .rain-bar.rain-heavy { background: var(--rain-heavy); }

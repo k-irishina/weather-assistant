@@ -28,6 +28,7 @@ moderate_gust_speed = 6.5
 strong_gust_speed = 9.0
 
 # live rain rates
+drizzle_rate = 0.1
 rain_starting_rate = 0.5
 moderate_rain_rate = 2.5
 heavy_rain_rate = 4.0
