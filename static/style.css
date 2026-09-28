@@ -58,6 +58,7 @@ body.glitter-mode::before {
 
 /* same pink as --accent below, kept literal since color-mix needs a plain
    color and this also carries its own alpha for the translucency */
+body.glitter-mode header,
 body.glitter-mode .card,
 body.glitter-mode select,
 body.glitter-mode .icon-button {
@@ -66,6 +67,45 @@ body.glitter-mode .icon-button {
 
 body.glitter-mode {
   --accent: #c46a94;
+  --glitter-title-from: #9e2f6b;
+  --glitter-title-to: #6f45a8;
+  --glitter-place: #7d1d4f;
+}
+
+@media (prefers-color-scheme: dark) {
+  body.glitter-mode {
+    --glitter-title-from: #f7b3d2;
+    --glitter-title-to: #d2bdf8;
+    --glitter-place: #f7b3d2;
+  }
+}
+
+body.glitter-mode header {
+  padding: .8rem 6rem .8rem 1.1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+body.glitter-mode .header-buttons {
+  top: .8rem;
+  right: .8rem;
+}
+
+/* inline-block so the gradient spans the words, not the whole row */
+body.glitter-mode h1 {
+  display: inline-block;
+  background: linear-gradient(90deg, var(--glitter-title-from), var(--glitter-title-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+body.glitter-mode .place {
+  margin-bottom: 0;
+  color: var(--glitter-place);
 }
 
 body.glitter-mode #glitter-toggle[aria-pressed="true"] {
