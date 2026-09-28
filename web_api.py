@@ -4,7 +4,6 @@ The page is the same assistant as the Telegram bot, for people who don't use
 Telegram.
 """
 import logging
-import math
 from pathlib import Path
 from datetime import datetime, time, timezone
 from typing import Optional
@@ -79,8 +78,8 @@ def _number(value) -> Optional[float]:
     return None if value is None else float(value)
 
 
-def _ceil(value) -> Optional[int]:
-    return None if value is None else math.ceil(float(value))
+def _temperature(value) -> Optional[int]:
+    return None if value is None else assistant.round_temperature(value)
 
 
 WEATHER_ICON_DIR = Path(__file__).resolve().parent / "static" / "icons" / "weather-icons"
@@ -100,7 +99,7 @@ FIRST_PERIOD_HOUR = time(6)
 
 def _period_hours(report: assistant.ForecastReport, start: time, until: time) -> list[dict]:
     return [
-        {"hour": _hour(hour), "temperature": _ceil(temperature)}
+        {"hour": _hour(hour), "temperature": _temperature(temperature)}
         for hour, temperature in sorted(report["hourly_temperatures"].items())
         if start <= hour < until
     ]
@@ -113,7 +112,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     temperatures = {
         key: {
             "label": label,
-            "temperature": _ceil(report["temperatures"][key]["avg_temperature"]),
+            "temperature": _temperature(report["temperatures"][key]["avg_temperature"]),
             "symbol_code": report["temperatures"][key].get("symbol_code"),
             "icon": _symbol_icon(report["temperatures"][key].get("symbol_code")),
             "hours": _period_hours(report, start, until),

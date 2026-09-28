@@ -1,4 +1,5 @@
 import logging as log
+import math
 import random
 from datetime import date, datetime, time, timedelta, timezone
 from statistics import mean
@@ -50,7 +51,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
 
     local_now = area_obj.region.now()
     forecast_day = local_now.date() if day == "today" else local_now.date() + timedelta(days=1)
-    tomorrow_available = local_now.time() >= time(18)
+    tomorrow_available = local_now.time() >= time(17)
 
     # analysed values
     avg_temperatures = db_connector.select_related_temperatures(area_obj, forecast_day)
@@ -234,8 +235,12 @@ def format_forecast_text_short(report: ForecastReport) -> str:
     return "\n".join(lines)
 
 
+def round_temperature(value) -> int:
+    return math.floor(float(value) + 0.5)
+
+
 def compact_temperature(value: Optional[float]) -> str:
-    return "–" if value is None else f"{round(float(value))}°"
+    return "–" if value is None else f"{round_temperature(value)}°"
 
 
 def compact_precipitation_text(report: ForecastReport) -> str:
