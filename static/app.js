@@ -189,13 +189,6 @@ function conditionList(items) {
 
 let forecastDay = 'today';
 
-function updatedLine(time) {
-  const line = document.createElement('p');
-  line.className = 'muted updated';
-  line.textContent = `Updated ${time}`;
-  return line;
-}
-
 async function loadForecast(day = 'today') {
   els.forecast.setAttribute('aria-busy', 'true');
   try {
@@ -216,6 +209,12 @@ async function loadForecast(day = 'today') {
     const heading = document.createElement('p');
     heading.className = 'forecast-day';
     heading.textContent = day === 'tomorrow' ? `Tomorrow, ${dayLabel}` : dayLabel;
+    if (data.updated_at) {
+      const updated = document.createElement('span');
+      updated.className = 'muted forecast-updated';
+      updated.textContent = `Updated ${data.updated_at}`;
+      heading.append(' ', updated);
+    }
 
     const headingRow = document.createElement('div');
     headingRow.className = 'forecast-day-row';
@@ -233,7 +232,6 @@ async function loadForecast(day = 'today') {
       headingRow,
       temperatureList(data.temperatures),
       conditionList(data.conditions),
-      ...(data.updated_at ? [updatedLine(data.updated_at)] : []),
     );
     els.forecast.classList.add('page-flip');
   } catch (err) {
@@ -285,7 +283,8 @@ async function loadNearTermForecast() {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
-    renderRightNow(data.now);
+    // "Now" line switched off until reworked
+    // renderRightNow(data.now);
     if (!data.available) {
       els.rain.hidden = true;
       return;
@@ -293,7 +292,7 @@ async function loadNearTermForecast() {
     renderRainStrip(data);
     els.rain.hidden = false;
   } catch (err) {
-    renderRightNow(null);
+    // renderRightNow(null);
     els.rain.hidden = true;
   }
 }
@@ -311,7 +310,7 @@ function scheduleNearTermForecastPoll() {
 }
 
 function renderRainStrip(data) {
-  els.rainUpdated.textContent = `Updated ${data.updated_at}.`;
+  els.rainUpdated.textContent = `Updated ${data.updated_at}`;
   const scale = Math.max(data.peak_rate, data.scale_floor);
 
   els.rainBars.replaceChildren(

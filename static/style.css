@@ -613,8 +613,25 @@ body.glitter-mode .right-now {
   text-shadow: 0 0 2px var(--bg), 0 0 5px var(--bg), 0 0 8px var(--bg);
 }
 
-.updated,
+.card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .5rem;
+}
+
+.card-heading h2 {
+  margin: 0;
+}
+
 #rain-updated {
-  margin: .5rem 0 0;
   font-size: .85rem;
+}
+
+.forecast-updated {
+  margin-left: .3rem;
+  font-size: .85rem;
+  font-weight: normal;
+  white-space: nowrap;
 }

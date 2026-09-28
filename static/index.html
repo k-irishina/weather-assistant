@@ -24,7 +24,9 @@
       </div>
       <h1>Weather Assistant</h1>
       <p class="place" id="place">Loading…</p>
+      <!-- "Now" line switched off until reworked
       <p class="right-now" id="right-now" hidden><span class="right-now-label">Now</span> <span id="right-now-text"></span></p>
+      -->
     </header>
 
     <section id="in-app" class="card in-app" hidden>
@@ -58,12 +60,14 @@
     </section>
 
     <section id="rain" class="card" hidden>
-      <h2>Two-hour rain</h2>
+      <div class="card-heading">
+        <h2>Two-hour rain</h2>
+        <span class="muted" id="rain-updated"></span>
+      </div>
       <div class="rain-strip">
         <div class="rain-bars" id="rain-bars" role="img" aria-label="Rain rate for the next two hours"></div>
         <div class="rain-ticks" id="rain-ticks"></div>
       </div>
-      <p class="muted" id="rain-updated"></p>
     </section>
 
     <section class="card">
