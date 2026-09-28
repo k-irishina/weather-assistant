@@ -188,6 +188,7 @@ function conditionList(items) {
 }
 
 let forecastDay = 'today';
+let forecastLoadedAt = 0;
 
 async function loadForecast(day = 'today') {
   els.forecast.setAttribute('aria-busy', 'true');
@@ -234,6 +235,7 @@ async function loadForecast(day = 'today') {
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
+    forecastLoadedAt = Date.now();
   } catch (err) {
     els.place.textContent = '';
     els.forecast.textContent = `Could not load the forecast (${err.message}).`;
@@ -275,6 +277,8 @@ function nextNearTermForecastPoll() {
   return inQuietHours(pollingRegionHour()) ? SLEEP_CHECK_MS : ACTIVE_POLL_MS;
 }
 
+let nearTermLoadedAt = 0;
+
 async function loadNearTermForecast() {
   try {
     const url = selectedArea === null
@@ -283,6 +287,7 @@ async function loadNearTermForecast() {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
+    nearTermLoadedAt = Date.now();
     // "Now" line switched off until reworked
     // renderRightNow(data.now);
     if (!data.available) {
@@ -301,6 +306,24 @@ function renderRightNow(text) {
   els.rightNowText.textContent = text || '';
   els.rightNow.hidden = !text;
 }
+
+const STALE_AFTER_MS = 15 * 60 * 1000;
+
+function refreshIfStale() {
+  if (document.visibilityState !== 'visible') return;
+  const now = Date.now();
+  if (now - forecastLoadedAt > STALE_AFTER_MS) {
+    loadForecast(forecastDay);
+    // also records last_seen for push subscribers
+    if (registration) showSubscriptionOptions();
+  }
+  if (now - nearTermLoadedAt > STALE_AFTER_MS) loadNearTermForecast();
+}
+
+document.addEventListener('visibilitychange', refreshIfStale);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) refreshIfStale();
+});
 
 function scheduleNearTermForecastPoll() {
   setTimeout(async () => {
