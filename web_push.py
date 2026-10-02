@@ -130,7 +130,7 @@ def send_to_subscriptions(subscriptions, title: str, body: str, tag: str) -> int
 
 
 def send_to_rain_subscribers(area_obj: area.Area, title: str, body: str) -> int:
-    subscriptions = db.rain_alert_subscriptions_for_area(area_obj)
+    subscriptions = db.rain_alert_subscriptions_for_area(area_obj, area_obj.region.now().time())
     delivered = sum(
         send_to_subscription(subscription, title, body, "rain-alert")
         for subscription in subscriptions

@@ -95,9 +95,12 @@ def baseline_cutoff(area_obj: area.Area, local_now: datetime) -> datetime:
     After the last morning push, that is the run it was built from, the earlier
     pushes are at most one MET update older, which rarely changes a rain call.
     """
-    sent_at = datetime.combine(
-        local_now.date(), max(constants.morning_push_times), tzinfo=local_now.tzinfo
+    # the last push before alerts can start, later pushes only get alerts
+    # once they are out, and are compared against this forecast too
+    last_early_push = max(
+        at for at in constants.morning_push_times if at.hour < constants.quiet_hours_end
     )
+    sent_at = datetime.combine(local_now.date(), last_early_push, tzinfo=local_now.tzinfo)
     return local_now if local_now < sent_at else sent_at
 
 

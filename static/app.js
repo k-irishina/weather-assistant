@@ -187,6 +187,13 @@ function conditionList(items) {
   return list;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function shortDate(isoDay) {
+  const [, month, day] = isoDay.split('-').map(Number);
+  return `${day} ${MONTHS[month - 1]}`;
+}
+
 let forecastDay = 'today';
 let forecastLoadedAt = 0;
 
@@ -204,12 +211,10 @@ async function loadForecast(day = 'today') {
 
     els.place.textContent = `${data.area} · 🌅 ${data.sunrise}, 🌇 ${data.sunset}`;
 
-    const dayLabel = new Date(`${data.day}T12:00:00`).toLocaleDateString(undefined, {
-      weekday: 'long', day: 'numeric', month: 'long',
-    });
+    const dayLabel = shortDate(data.day);
     const heading = document.createElement('p');
     heading.className = 'forecast-day';
-    heading.textContent = day === 'tomorrow' ? `Tomorrow, ${dayLabel}` : dayLabel;
+    heading.textContent = dayLabel;
     if (data.updated_at) {
       const updated = document.createElement('span');
       updated.className = 'muted updated-note';

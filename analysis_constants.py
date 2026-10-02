@@ -38,7 +38,7 @@ min_shown_uv_index = 2.5
 
 
 # push notifications
-morning_push_times = (time(6, 0), time(6, 30), time(7, 15))
+morning_push_times = (time(6, 0), time(6, 30), time(7, 15), time(9, 0))
 # web default and Telegram bot
 default_morning_push_at = time(7, 15)
 sun_update_at = time(12, 15)

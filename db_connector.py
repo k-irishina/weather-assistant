@@ -759,16 +759,19 @@ def set_rain_alerts(endpoint: str, enabled: bool) -> bool:
     return updated > 0
 
 
-def rain_alert_subscriptions_for_area(area_obj: area.Area) -> list[WebSubscription]:
+def rain_alert_subscriptions_for_area(
+    area_obj: area.Area, local_time: time
+) -> list[WebSubscription]:
+    """Rain alert subscribers who have already had their morning forecast."""
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT endpoint, p256dh, auth, is_admin
                 FROM web_subscriptions
-                WHERE area = %s AND rain_alerts = TRUE
+                WHERE area = %s AND rain_alerts = TRUE AND morning_push_at <= %s
                 """,
-                (area_obj.id,),
+                (area_obj.id, local_time),
             )
             return [WebSubscription(*row) for row in cur.fetchall()]
 
