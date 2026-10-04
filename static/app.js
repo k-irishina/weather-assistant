@@ -354,15 +354,18 @@ function renderRainStrip(data) {
     })
   );
 
-  const steps = data.steps;
-  const ticks = steps.length
-    ? [steps[0], steps[Math.floor(steps.length / 2)], steps[steps.length - 1]]
-    : [];
   els.rainTicks.replaceChildren(
-    ...ticks.map((step) => {
-      const span = document.createElement('span');
-      span.textContent = step.time;
-      return span;
+    ...data.steps.map((step, index) => {
+      const cell = document.createElement('div');
+      cell.className = 'rain-tick';
+      const [hour, minute] = step.time.split(':');
+      const roundTime = Number(minute) % 30 < 5;
+      if (index === 0 || (roundTime && index >= 3)) {
+        const label = document.createElement('span');
+        label.textContent = index === 0 ? step.time : `${hour}:${Number(minute) < 30 ? '00' : '30'}`;
+        cell.append(label);
+      }
+      return cell;
     })
   );
 }
