@@ -17,7 +17,8 @@ CREATE TABLE forecast_update_log(
              forecast_created_at timestamptz NOT NULL,
              forecast_last_modified timestamptz,
              forecast_expire_time timestamptz,
-             area integer NOT NULL);
+             area integer NOT NULL UNIQUE,
+             forecast_checked_at timestamptz);
 
 CREATE TABLE sunrise(
              id SERIAL PRIMARY KEY,
@@ -27,7 +28,6 @@ CREATE TABLE sunrise(
              region_id integer NOT NULL);
 
 CREATE INDEX region_id_for_date ON sunrise(for_date, region_id);
-CREATE INDEX idx_forecast_update_log_area ON forecast_update_log(area);
 
 CREATE INDEX idx_forecast_complete_area_time ON forecast_complete(area, forecast_time);
 

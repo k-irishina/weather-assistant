@@ -434,24 +434,53 @@ def fetch_user_location(user_id) -> int:
 
 
 def log_forecast(created_at, modified, expires, area: area.Area):
+    values = {"created": created_at, "modified": modified, "expires": expires, "area": area.id}
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified, forecast_expire_time, area) 
-                VALUES (%s, %s, %s, %s)
+                UPDATE forecast_update_log
+                SET forecast_created_at = %(created)s,
+                    forecast_last_modified = %(modified)s,
+                    forecast_expire_time = %(expires)s,
+                    forecast_checked_at = now()
+                WHERE area = %(area)s
                 """,
-                (created_at, modified, expires, area.id),
+                values,
             )
-            conn.commit()
+            if cur.rowcount == 0:
+                cur.execute(
+                    """
+                    INSERT INTO forecast_update_log(forecast_created_at, forecast_last_modified,
+                                                    forecast_expire_time, area, forecast_checked_at)
+                    VALUES (%(created)s, %(modified)s, %(expires)s, %(area)s, now())
+                    """,
+                    values,
+                )
+        conn.commit()
 
 
-def latest_forecast_run_at(area: area.Area) -> Optional[datetime]:
+def record_forecast_check(area: area.Area, expires: Optional[datetime]) -> None:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT forecast_created_at
+                UPDATE forecast_update_log
+                SET forecast_checked_at = now(),
+                    forecast_expire_time = COALESCE(%(expires)s, forecast_expire_time)
+                WHERE area = %(area)s
+                """,
+                {"expires": expires, "area": area.id},
+            )
+        conn.commit()
+
+
+def latest_forecast_check_at(area: area.Area) -> Optional[datetime]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COALESCE(forecast_checked_at, forecast_created_at)
                 FROM forecast_update_log
                 WHERE area = %s
                 ORDER BY id DESC

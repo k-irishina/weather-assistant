@@ -45,6 +45,8 @@ def fetch_forecast_for_area_id(area_id):
     
     response = yr_requests.get_weather_complete(user_area, last_modified)
     if response.status_code == 304:
+        expires = response.headers.get('Expires')
+        db.record_forecast_check(user_area, parse_http_date(expires) if expires else None)
         return
     elif response.status_code != 200:
         return

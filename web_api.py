@@ -142,8 +142,8 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         "tomorrow_available": report["show_tomorrow"],
         "generated_at": report["local_now"].isoformat(),
         "updated_at": (
-            None if report["forecast_run_at"] is None
-            else report["forecast_run_at"].astimezone(report["local_now"].tzinfo).strftime("%H:%M")
+            None if report["forecast_checked_at"] is None
+            else report["forecast_checked_at"].astimezone(report["local_now"].tzinfo).strftime("%H:%M")
         ),
         "greeting": greeting,
         "temperatures": temperatures,

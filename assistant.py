@@ -34,7 +34,7 @@ class ForecastReport(TypedDict):
     show_tomorrow: bool
     temperatures: dict
     hourly_temperatures: dict[time, float]
-    forecast_run_at: Optional[datetime]
+    forecast_checked_at: Optional[datetime]
     uv_index: float
     sunrise_sunset: db_connector.SunriseTimes
     sunny_times: dict[time, float]
@@ -71,7 +71,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         area_obj, forecast_day, "next_6_hours"
     )
     uv_index = db_connector.highest_uv_index(area_obj, forecast_day)
-    forecast_run_at = db_connector.latest_forecast_run_at(area_obj)
+    forecast_checked_at = db_connector.latest_forecast_check_at(area_obj)
     wind_by_hour = db_connector.evaluate_wind(area_obj, forecast_day)
     hourly_temperatures = db_connector.hourly_temperatures(area_obj, forecast_day)
 
@@ -94,7 +94,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         temperatures=avg_temperatures,
         hourly_temperatures=hourly_temperatures,
         uv_index=uv_index,
-        forecast_run_at=forecast_run_at,
+        forecast_checked_at=forecast_checked_at,
         sunrise_sunset=sunrise_sunset,
         sunny_times=sunny_times,
         precipitation=precipitation_type(avg_temperatures),
