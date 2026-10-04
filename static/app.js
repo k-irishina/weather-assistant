@@ -9,6 +9,7 @@ const els = {
   rainUpdated: document.getElementById('rain-updated'),
   rainBars: document.getElementById('rain-bars'),
   rainTicks: document.getElementById('rain-ticks'),
+  rainScale: document.getElementById('rain-scale'),
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
   pushSettings: document.getElementById('push-settings'),
@@ -336,6 +337,16 @@ function scheduleNearTermForecastPoll() {
     scheduleNearTermForecastPoll();
   }, nextNearTermForecastPoll());
 }
+
+// tapping the graph explains the bars for a moment, instead of a permanent caption
+const RAIN_SCALE_SHOWN_MS = 4000;
+let rainScaleTimer = null;
+
+els.rainBars.addEventListener('click', () => {
+  clearTimeout(rainScaleTimer);
+  els.rainScale.hidden = false;
+  rainScaleTimer = setTimeout(() => { els.rainScale.hidden = true; }, RAIN_SCALE_SHOWN_MS);
+});
 
 function renderRainStrip(data) {
   els.rainUpdated.textContent = `Updated ${data.updated_at}`;

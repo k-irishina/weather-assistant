@@ -265,6 +265,7 @@ select {
   height: 72px;
   padding-bottom: 1px;
   border-bottom: 1px solid var(--line);
+  cursor: pointer;
 }
 
 .rain-bar {
