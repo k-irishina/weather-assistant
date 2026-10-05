@@ -689,11 +689,15 @@ body.glitter-mode .right-now {
 #about-toggle.has-news::after {
   content: "";
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: .6rem;
-  height: .6rem;
+  top: 1px;
+  right: 1px;
+  width: .4rem;
+  height: .4rem;
   border-radius: 50%;
-  background: #e5484d;
-  border: 2px solid var(--bg);
+  background: var(--sun);
+  border: 1px solid var(--bg);
+}
+
+body.glitter-mode #about-toggle.has-news::after {
+  background: #f3a6c8;
 }
