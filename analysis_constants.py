@@ -3,6 +3,12 @@ from typing import Optional
 
 default_area_id = 1
 
+forecast_period_hours = {
+    "morning": ((6, 7, 8, 9), 7),
+    "midday": ((12, 13, 14), 13),
+    "evening": ((18, 19, 20), 19),
+}
+
 #cloud cover
 max_total_clouds = 30.0
 percentage_total_clouds = 35.0

@@ -109,48 +109,31 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
 
 
 def select_related_temperatures(area: area.Area, date):
-    timezone = str(area.region.timezone)
+    periods = analysis_constants.forecast_period_hours
     day_start, day_end = local_day_bounds(area, date)
     query = """
-    WITH localized_data AS (
-        SELECT
-            (forecast_time AT TIME ZONE %(tz)s) AS local_ts,
-            forecast_data,
-            id,
-            forecast_time
-        FROM forecast_complete
-        WHERE area = %(area)s
+    WITH period_hours AS (
+        SELECT * FROM unnest(%(names)s::text[], %(hours)s::int[]) AS p(time_period, hour)
     ),
     latest_rows AS (
-        SELECT *
-        FROM localized_data
-        WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
-            AND local_ts::time IN (
-              '06:00:00', '07:00:00', '08:00:00', '09:00:00',
-              '12:00:00', '13:00:00', '14:00:00',
-              '18:00:00', '19:00:00', '20:00:00'
-            )
-            AND id IN (
-                SELECT MAX(id)
-                FROM forecast_complete
-                WHERE area = %(area)s
-                GROUP BY forecast_time
-            )
-      )
-    SELECT
-    CASE
-        WHEN local_ts::time IN ('06:00:00', '07:00:00', '08:00:00', '09:00:00') THEN 'morning'
-        WHEN local_ts::time IN ('12:00:00', '13:00:00', '14:00:00') THEN 'midday'
-        WHEN local_ts::time IN ('18:00:00', '19:00:00', '20:00:00') THEN 'evening'
-    END AS time_period,
-    ROUND(AVG((forecast_data->>'air_temperature')::numeric), 1) AS avg_temperature,
-    COALESCE(
-        MAX(forecast_data->'next_1_hours'->>'symbol_code')
-            FILTER (WHERE local_ts::time IN ('07:00:00', '13:00:00', '19:00:00')),
-        MAX(forecast_data->'next_1_hours'->>'symbol_code')
-    ) AS symbol_code
+        SELECT forecast_data,
+               EXTRACT(HOUR FROM forecast_time AT TIME ZONE %(tz)s)::int AS local_hour
+        FROM forecast_complete
+        WHERE area = %(area)s
+          AND forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+          AND id IN (
+              SELECT MAX(id)
+              FROM forecast_complete
+              WHERE area = %(area)s
+                AND forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+              GROUP BY forecast_time
+          )
+    )
+    SELECT period_hours.time_period,
+           ROUND(AVG((forecast_data->>'air_temperature')::numeric), 1) AS avg_temperature
     FROM latest_rows
-    GROUP BY time_period;
+    JOIN period_hours ON period_hours.hour = latest_rows.local_hour
+    GROUP BY period_hours.time_period;
 """
 
     with connpool.connection() as conn:
@@ -158,25 +141,22 @@ def select_related_temperatures(area: area.Area, date):
             cursor.execute(
                 query,
                 {
-                    "tz": timezone,
+                    "tz": str(area.region.timezone),
                     "area": area.id,
                     "day_start": day_start,
                     "day_end": day_end,
+                    "names": [name for name, (hours, _) in periods.items() for _hour in hours],
+                    "hours": [hour for hours, _ in periods.values() for hour in hours],
                 },
             )
-            results = cursor.fetchall()
-
-            # Process results into a dictionary
             formatted_results = {
-                row[0]: {"avg_temperature": row[1], "symbol_code": row[2]}
-                for row in results
+                time_period: {"avg_temperature": avg}
+                for time_period, avg in cursor.fetchall()
             }
 
-            # in case of missing data
-            for period in ["morning", "midday", "evening"]:
-                formatted_results.setdefault(
-                    period, {"avg_temperature": None, "symbol_code": None}
-                )
+    # in case of missing data
+    for time_period in periods:
+        formatted_results.setdefault(time_period, {"avg_temperature": None})
 
     return formatted_results
 
@@ -342,6 +322,33 @@ def hourly_temperatures(area: area.Area, date: date) -> dict[time, float]:
                       GROUP BY forecast_time
                   )
                   AND forecast_data->>'air_temperature' IS NOT NULL
+                ORDER BY forecast_time
+                """,
+                {"tz": timezone, "day_start": day_start, "day_end": day_end, "area": area.id},
+            )
+            return dict(cursor.fetchall())
+
+
+def hourly_symbols(area: area.Area, date: date) -> dict[time, str]:
+    timezone = str(area.region.timezone)
+    day_start, day_end = local_day_bounds(area, date)
+    with connpool.connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT (forecast_time AT TIME ZONE %(tz)s)::time,
+                       forecast_data->'next_1_hours'->>'symbol_code'
+                FROM forecast_complete
+                WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                  AND area = %(area)s
+                  AND id IN (
+                      SELECT MAX(id)
+                      FROM forecast_complete
+                      WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
+                        AND area = %(area)s
+                      GROUP BY forecast_time
+                  )
+                  AND forecast_data->'next_1_hours'->>'symbol_code' IS NOT NULL
                 ORDER BY forecast_time
                 """,
                 {"tz": timezone, "day_start": day_start, "day_end": day_end, "area": area.id},
@@ -515,32 +522,35 @@ class SunriseTimes(TypedDict):
     sunrise_time: time
     sunset_time: time
 
-def fetch_sunrise_sunset(
-    area: area.Area, target_date: date, days_before: int = 1
-) -> Optional[SunriseTimes]:
-    start_date = target_date - timedelta(days=days_before)
+def local_sun_times(area: area.Area, sunrise: datetime, sunset: datetime) -> SunriseTimes:
+    tz = area.region.timezone
+    return SunriseTimes(sunrise_time=sunrise.astimezone(tz).time(), sunset_time=sunset.astimezone(tz).time())
+
+
+def fetch_sunrise_sunset(area: area.Area, target_date: date) -> Optional[SunriseTimes]:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                         SELECT sunrise_time, sunset_time
                         FROM sunrise
-                        WHERE for_date BETWEEN %s AND %s
+                        WHERE for_date = %s
                             AND region_id = %s
-                        ORDER BY for_date DESC
-                        LIMIT 1
                         """,
-                (start_date, target_date, area.region.region_id),
+                (target_date, area.region.region_id),
             )
             row = cur.fetchone()
-            if row:
-                sunrise_utc, sunset_utc = row
+            return local_sun_times(area, *row) if row else None
 
-                sunrise = sunrise_utc.astimezone(area.region.timezone).time()
-                sunset = sunset_utc.astimezone(area.region.timezone).time()
 
-                return SunriseTimes(sunrise_time=sunrise, sunset_time=sunset)
-            return None
+def reuse_sun_times_for(area: area.Area, target_date: date) -> None:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE sunrise SET for_date = %s WHERE region_id = %s",
+                (target_date, area.region.region_id),
+            )
+        conn.commit()
 
 
 def toggle_updates(user_id) -> bool:

@@ -1,6 +1,7 @@
 import logging as log
 import math
 import random
+from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 from statistics import mean
 from typing import NamedTuple, Optional, TypedDict
@@ -46,6 +47,46 @@ class ForecastReport(TypedDict):
     wind_by_hour: dict[time, db_connector.WindReading]
 
 
+ICON_SUFFIXES = ("_day", "_night", "_polartwilight")
+
+
+def split_symbol(code: str) -> tuple[str, str]:
+    """"fair_night" -> ("fair", "_night"); symbols without a sun variant keep "" """
+    for suffix in ICON_SUFFIXES:
+        if code.endswith(suffix):
+            return code[: -len(suffix)], suffix
+    return code, ""
+
+
+def daylight_minutes(first_hour: int, last_hour: int, sunrise: time, sunset: time) -> int:
+    start = datetime.combine(date.min, time(first_hour))
+    end = start + timedelta(hours=last_hour - first_hour + 1)
+    rise = datetime.combine(date.min, sunrise.replace(tzinfo=None))
+    sets = datetime.combine(date.min, sunset.replace(tzinfo=None))
+    return max(0, int((min(end, sets) - max(start, rise)).total_seconds() // 60))
+
+
+def period_symbol(symbols: dict[time, str], hours, tie_hour: int, daylight: int) -> Optional[str]:
+    """The period's most common weather, as a day icon if the period has some daylight."""
+    seen = [split_symbol(symbols[time(h)]) for h in hours if symbols.get(time(h))]
+    if not seen:
+        return None
+    counts = Counter(base for base, _ in seen)
+    top = max(counts.values())
+    tied = [base for base in counts if counts[base] == top]
+    tie_breaker = split_symbol(symbols[time(tie_hour)])[0] if symbols.get(time(tie_hour)) else None
+    base = tie_breaker if tie_breaker in tied else tied[0]
+
+    suffixes = [suffix for b, suffix in seen if b == base and suffix]
+    if not suffixes:
+        return base
+    # minutes
+    if daylight >= 30:
+        return base + "_day"
+    dark = [suffix for suffix in suffixes if suffix != "_day"]
+    return base + (Counter(dark).most_common(1)[0][0] if dark else "_night")
+
+
 def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport:
     rcf.fetch_forecast_for_area_id(area_obj.id)
 
@@ -56,6 +97,11 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     # analysed values
     avg_temperatures = db_connector.select_related_temperatures(area_obj, forecast_day)
     sunrise_sunset = rcf.fetch_sunset_sunrise_for_area(area_obj)
+    symbols = db_connector.hourly_symbols(area_obj, forecast_day)
+    for key, (hours, tie_hour) in constants.forecast_period_hours.items():
+        daylight = daylight_minutes(
+            hours[0], hours[-1], sunrise_sunset["sunrise_time"], sunrise_sunset["sunset_time"])
+        avg_temperatures[key]["symbol_code"] = period_symbol(symbols, hours, tie_hour, daylight)
     sunny_times = db_connector.evaluate_clouds(
         area_obj,
         forecast_day,

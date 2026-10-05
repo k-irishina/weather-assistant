@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import analysis_constants as constants
 import app_config
@@ -96,39 +95,15 @@ def fetch_sunset_sunrise(user_id) -> db.SunriseTimes:
 
 
 def fetch_sunset_sunrise_for_area(user_area: area.Area) -> db.SunriseTimes:
-    date_today = user_area.region.today()
-        # we don't require high accuracy here, so 5 days is acceptable
-    sunrise_sunset_stored = db.fetch_sunrise_sunset(user_area, date_today, 5)
-    if sunrise_sunset_stored:
-        log.info("returning stored sun data")
-        return sunrise_sunset_stored
+    today = user_area.region.today()
+    stored = db.fetch_sunrise_sunset(user_area, today)
+    if stored:
+        return stored
+
+    sun = yr_requests.get_sun_times(user_area, today)
+    if sun:
+        db.store_city_sunset_sunrise_times(user_area, today, *sun)
     else:
-        log.info("fetching new sun data from MET")
-        sunrise_sunset_response = yr_requests.get_celestial(user_area, date_today)
-        if sunrise_sunset_response.status_code != 200:
-            log.error("Failed to call Sunrise API, returning default")
-            return {"sunrise_time": time(7, 00), "sunset_time": time(17, 00)}
-        else:
-            data = sunrise_sunset_response.json()
-            sunrise_response = data["properties"]["sunrise"]["time"]
-            sunset_response = data["properties"]["sunset"]["time"]
-            sunrise = time_of_timezone(sunrise_response, user_area.region.timezone)
-            sunset = time_of_timezone(sunset_response, user_area.region.timezone)
-            log.info(f"sunrise={sunrise}")
-            log.info(f"sunset={sunset}")
-            log.info("Storing sun info to DB.")
-            db.store_city_sunset_sunrise_times(
-                user_area,
-                date_today,
-                parse_utc(sunrise_response),
-                parse_utc(sunset_response),
-            )
-
-            return {
-                "sunrise_time": sunrise,
-                "sunset_time": sunset
-            }
-
-def time_of_timezone(iso_str: str, tz: ZoneInfo) -> time:
-    """Local time of an ISO-8601 instant, in timezone tz"""
-    return parse_utc(iso_str).astimezone(tz).time()
+        # if celestial is down, we reuse the last stored time
+        db.reuse_sun_times_for(user_area, today)
+    return db.fetch_sunrise_sunset(user_area, today) or {"sunrise_time": time(7, 0), "sunset_time": time(17, 0)}
