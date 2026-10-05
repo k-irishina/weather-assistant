@@ -652,3 +652,48 @@ body.glitter-mode .right-now {
   font-weight: normal;
   white-space: nowrap;
 }
+
+.changelog-heading {
+  margin-top: 1.1rem;
+}
+
+.changelog {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.changelog li {
+  display: flex;
+  gap: .6rem;
+  margin: .3rem 0;
+}
+
+.changelog time {
+  flex: none;
+  min-width: 3.2rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-older summary {
+  margin-top: .3rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+#about-toggle {
+  position: relative;
+}
+
+#about-toggle.has-news::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: #e5484d;
+  border: 2px solid var(--bg);
+}

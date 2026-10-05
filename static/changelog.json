@@ -1,0 +1,22 @@
+[
+  {
+    "date": "2026-10-05",
+    "text": "Better icons for the forecast periods taking into account sunlight. And changelog!"
+  },
+  {
+    "date": "2026-10-04",
+    "text": "Improved times on the rain graph and showing interval duration on tap. Fixed 'Updated' showing an older time than actual data fetch/calculation."
+  },
+  {
+    "date": "2026-10-02",
+    "text": "9:00 option for the morning forecast, visual improvements and improved rain graph."
+  },
+  {
+    "date": "2026-09-28",
+    "text": "Hour-by-hour temperatures now available. New locations added. Faster site loading and refresh-on-open. The UV index only shows from 3 up."
+  },
+  {
+    "date": "2026-09-23",
+    "text": "Custom morning forecast times and opt-out weekend notifications. Fixed morning forecast not using latest rain radar."
+  }
+]

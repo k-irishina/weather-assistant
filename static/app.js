@@ -33,6 +33,8 @@ const els = {
   inAppNote: document.getElementById('in-app-note'),
   aboutToggle: document.getElementById('about-toggle'),
   about: document.getElementById('about'),
+  changelog: document.getElementById('changelog'),
+  changelogEntries: document.getElementById('changelog-entries'),
 };
 
 let registration = null;
@@ -775,13 +777,79 @@ els.glitterToggle.onclick = () => {
   }
 };
 
+// "What's new" dot for people to see the changelog updates
+const SEEN_CHANGES_KEY = 'weather-assistant-seen-changes';
+const RECENT_CHANGES_SHOWN = 5;
+let changelog = [];
+
+function newestChange() {
+  return changelog.length ? changelog[0].date : null;
+}
+
+function showNewsDot(show) {
+  els.aboutToggle.classList.toggle('has-news', show);
+  els.aboutToggle.setAttribute('aria-label', show ? 'About this app, with new changes' : 'About this app');
+}
+
+function changeList(entries) {
+  const list = document.createElement('ul');
+  list.className = 'changelog';
+  for (const { date, text } of entries) {
+    const item = document.createElement('li');
+    const when = document.createElement('time');
+    when.dateTime = date;
+    when.textContent = shortDate(date);
+    item.append(when, ` ${text}`);
+    list.append(item);
+  }
+  return list;
+}
+
+async function loadChangelog() {
+  try {
+    const res = await fetch('/changelog.json');
+    if (!res.ok) return;
+    changelog = await res.json();
+  } catch (err) {
+    return;
+  }
+  if (!changelog.length) return;
+
+  const parts = [changeList(changelog.slice(0, RECENT_CHANGES_SHOWN))];
+  if (changelog.length > RECENT_CHANGES_SHOWN) {
+    const older = document.createElement('details');
+    older.className = 'changelog-older';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Older changes';
+    older.append(summary, changeList(changelog.slice(RECENT_CHANGES_SHOWN)));
+    parts.push(older);
+  }
+  els.changelogEntries.replaceChildren(...parts);
+  els.changelog.hidden = false;
+
+  try {
+    const seen = localStorage.getItem(SEEN_CHANGES_KEY);
+    showNewsDot(!els.about.hidden ? false : seen === null || seen < newestChange());
+    if (!els.about.hidden) localStorage.setItem(SEEN_CHANGES_KEY, newestChange());
+  } catch (err) {
+  }
+}
+
 els.aboutToggle.onclick = () => {
   const open = els.about.hidden;
   els.about.hidden = !open;
   els.aboutToggle.setAttribute('aria-expanded', String(open));
+  if (open && newestChange()) {
+    showNewsDot(false);
+    try {
+      localStorage.setItem(SEEN_CHANGES_KEY, newestChange());
+    } catch (err) {
+    }
+  }
 };
 
 showInAppBanner();
+loadChangelog();
 
 setUpAreas()
   .catch(() => { /* if can't load areas we don't crash the page*/ })
