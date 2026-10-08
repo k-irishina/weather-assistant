@@ -27,6 +27,8 @@ moderate_wind_speed = 5.0
 strong_wind_speed = 8.0
 
 min_significant_moderate_wind_run_hours = 4
+# moderate wind before 5AM isn't important
+moderate_wind_mentioned_from = time(5)
 
 max_bridge_gap_hours = 1
 

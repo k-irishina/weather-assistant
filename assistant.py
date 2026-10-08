@@ -354,7 +354,7 @@ def wind_conditions(wind_by_hour: dict, min_moderate_run_hours: int = 1) -> list
                                text=f"Strong wind at {format_hours(strong)}."))
 
     moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
-    moderate = significant_hours(moderate, min_moderate_run_hours)
+    moderate = significant_moderate_wind_hours(moderate, min_moderate_run_hours)
     if moderate:
         items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
                                text=f"Moderate wind at {format_hours(moderate)}."))
@@ -379,8 +379,9 @@ def hour_runs(hours) -> list:
     return runs
 
 
-def significant_hours(hours, min_run_hours: int) -> list:
-    return [hour for run in hour_runs(hours) if len(run) >= min_run_hours for hour in run]
+def significant_moderate_wind_hours(hours, min_run_hours: int) -> list:
+    daytime = [hour for hour in hours if hour >= constants.moderate_wind_mentioned_from]
+    return [hour for run in hour_runs(daytime) if len(run) >= min_run_hours for hour in run]
 
 
 def bridge_gaps(hours, max_gap_hours: int, blocked=frozenset()) -> list:
@@ -431,7 +432,7 @@ def precipitation_conditions(
         possible = bridge_gaps(sorted(potentialprcpt), constants.max_bridge_gap_hours, blocked=high_set)
         items.append(WeatherCondition(
             kind="rain", emoji=active,
-            text=f"Possible {name} at {format_hours(possible)}."))
+            text=f"Might {name} at {format_hours(possible)}."))
     if items:
         return items
 
@@ -456,10 +457,7 @@ def compose_precipitation_text(
     )
 
 
-def get_greeting(current_hour: int = None):
-    if current_hour is None:
-        current_hour = datetime.now().hour
-
+def get_greeting(current_hour: int):
     # Define the time ranges and their respective greeting phrases
     greetings = [
         (
@@ -513,7 +511,7 @@ def detect_sun_change(user_id):
 
 def detect_sun_change_for_area(select_area: area.Area):
     # get previous forecast (time fetched < 10AM local time of the day)
-    hours_since_cutoff = select_area.region.now().hour - time(hour=10, minute=0).hour
+    hours_since_cutoff = select_area.region.now().hour - 10
 
     if hours_since_cutoff < 0:
         log.debug('No changes to analyse yet, offset:' + str(hours_since_cutoff))
@@ -613,11 +611,7 @@ def precipitation_type(avg_temps: dict[str, dict[str, float]]) -> Precipitation:
 
 
 def group_by_time(data):
-    grouped = {}
-    for item in data:
-        applicable_time = item['forecast_time']
-        grouped[applicable_time] = item['data']
-    return grouped
+    return {item['forecast_time']: item['data'] for item in data}
 
 def assign_user_location(user_id, area: area.Area):
     db_connector.update_user_location(user_id, area)

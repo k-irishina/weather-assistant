@@ -15,20 +15,12 @@ STEP_MINUTES = 5
 
 COVERED_REGIONS = frozenset({area.OSLO})
 
-RAIN_DESCRIPTIONS = {
-    "light": "light rain",
-    "moderate": "moderate rain",
-    "heavy": "heavy rain",
-}
-
-
 class RainStep(NamedTuple):
     time: datetime  # UTC
     rate: float  # mm/h
 
 
 class NearTermSeries(NamedTuple):
-    area_id: int
     created_at: datetime  # UTC, from properties.meta.updated_at
     radar_coverage: str
     steps: list[RainStep]
@@ -38,7 +30,7 @@ def is_covered(area_obj: area.Area) -> bool:
     return area_obj.region in COVERED_REGIONS
 
 
-def parse_near_term_forecast(area_id: int, payload: dict) -> NearTermSeries:
+def parse_near_term_forecast(payload: dict) -> NearTermSeries:
     properties = payload["properties"]
     meta = properties.get("meta") or {}
 
@@ -51,7 +43,6 @@ def parse_near_term_forecast(area_id: int, payload: dict) -> NearTermSeries:
         steps.append(RainStep(time=json_processor.parse_utc(entry["time"]), rate=float(rate)))
 
     return NearTermSeries(
-        area_id=area_id,
         created_at=json_processor.parse_utc(meta["updated_at"]),
         radar_coverage=meta.get("radar_coverage", "unknown"),
         steps=steps,
@@ -106,7 +97,7 @@ def fetch_and_store(area_obj: area.Area):
                     area_obj.display_name, response.status_code)
         return None
 
-    series = parse_near_term_forecast(area_obj.id, response.json())
+    series = parse_near_term_forecast(response.json())
     if not series.steps:
         log.info("Near-term forecast for %s had no rain steps (coverage: %s)",
                     area_obj.display_name, series.radar_coverage)
@@ -141,7 +132,6 @@ def latest_series(
 
     created_at, coverage, steps = row
     return NearTermSeries(
-        area_id=area_obj.id,
         created_at=created_at,
         radar_coverage=coverage,
         steps=[
@@ -161,7 +151,7 @@ def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
         return ""
 
     period = periods[0]
-    description = RAIN_DESCRIPTIONS[level_of(peak_rate(period))]
+    description = f"{level_of(peak_rate(period))} rain"
 
     if period[0] is series.steps[0]:
         opening = f"{description.capitalize()} now"
