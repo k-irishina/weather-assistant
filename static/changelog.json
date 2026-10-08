@@ -1,5 +1,9 @@
 [
   {
+    "date": "2026-10-08",
+    "text": "Not showing moderate wind if it only happens in late night hours to make forecast more relevant."
+  },
+  {
     "date": "2026-10-05",
     "text": "Better icons for the forecast periods taking into account sunlight. And changelog!"
   },
