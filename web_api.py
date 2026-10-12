@@ -184,9 +184,8 @@ def get_forecast(area: Optional[int] = None, day: str = "today") -> dict:
 def get_near_term_forecast(area: Optional[int] = None) -> dict:
     chosen = resolve_area(area)
     series = near_term_forecast.latest_series(chosen)
-    # overnight the radar isn't fetched so the last run can seem super old
-    if series is not None and not near_term_forecast.is_fresh(series, datetime.now(timezone.utc)):
-        series = None
+    if series is not None:
+        series = near_term_forecast.without_past_steps(series, datetime.now(timezone.utc))
     return near_term_forecast.page_payload(series, chosen)
 
 

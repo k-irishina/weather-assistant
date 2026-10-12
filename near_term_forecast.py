@@ -98,8 +98,11 @@ def fetch_and_store(area_obj: area.Area):
         return None
 
     series = parse_near_term_forecast(response.json())
+    # "temporarily unavailable" or "no coverage" means radar is off
+    if series.radar_coverage != "ok":
+        return None
     if not series.steps:
-        log.info("Near-term forecast for %s had no rain steps (coverage: %s)",
+        log.debug("Near-term forecast for %s had no rain steps (coverage: %s)",
                     area_obj.display_name, series.radar_coverage)
         return None
 
@@ -112,7 +115,7 @@ def fetch_and_store(area_obj: area.Area):
         serialise_steps(series.steps),
     )
     if stored:
-        log.info("Stored near-term forecast for %s: %s steps, peak %.1f mm/h",
+        log.debug("Stored near-term forecast for %s: %s steps, peak %.1f mm/h",
                  area_obj.display_name, len(series.steps), peak_rate(series.steps))
     return series
 
@@ -206,6 +209,12 @@ class RadarHours(NamedTuple):
 
 def _hour_start(moment: datetime) -> datetime:
     return moment.replace(minute=0, second=0, microsecond=0)
+
+
+def without_past_steps(series: NearTermSeries, now: datetime) -> NearTermSeries:
+    step_length = timedelta(minutes=STEP_MINUTES)
+    still_ahead = [step for step in series.steps if step.time + step_length > now]
+    return NearTermSeries(series.created_at, series.radar_coverage, still_ahead)
 
 
 def is_fresh(series: NearTermSeries, at: datetime) -> bool:
