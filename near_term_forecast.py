@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 STEP_MINUTES = 5
 
-COVERED_REGIONS = frozenset({area.OSLO})
+COVERED_REGIONS = frozenset({area.OSLO, area.AKERSHUS})
 
 class RainStep(NamedTuple):
     time: datetime  # UTC

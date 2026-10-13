@@ -11,6 +11,7 @@ import app_config
 import area
 import assistant
 import db_connector as db
+import met_alerts
 
 log = logging.getLogger(__name__)
 
@@ -106,19 +107,26 @@ async def push_morning_forecast(at: time) -> None:
         subscriptions = db.morning_subscriptions_for_area(area_obj, at, weekend)
         if not subscriptions:
             continue
+        admins = [s for s in subscriptions if s.is_admin]
+        others = [s for s in subscriptions if not s.is_admin]
         try:
             report = assistant.forecast_for_area(area_obj)
-            text = assistant.format_forecast_text_short(report)
+            texts = [(others, assistant.format_forecast_text_short(report))]
+            if admins:
+                alerts = met_alerts.alerts_for(area_obj, area_obj.region.today())
+                texts.append((admins, assistant.format_forecast_text_short(report, alerts)))
         except Exception:
             log.exception("Could not build forecast for %s", area_obj.display_name)
             continue
-        await asyncio.to_thread(
-            send_to_subscriptions,
-            subscriptions,
-            f"Forecast for {area_obj.display_name}",
-            text.strip(),
-            "morning-forecast",
-        )
+        for recipients, text in texts:
+            if recipients:
+                await asyncio.to_thread(
+                    send_to_subscriptions,
+                    recipients,
+                    f"Forecast for {area_obj.display_name}",
+                    text.strip(),
+                    "morning-forecast",
+                )
         log.info("Morning forecast %s for %s", at.strftime("%H:%M"), area_obj.display_name)
 
 

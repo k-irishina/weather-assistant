@@ -701,3 +701,11 @@ body.glitter-mode .right-now {
 body.glitter-mode #about-toggle.has-news::after {
   background: #f3a6c8;
 }
+
+.warnings {
+  border-left: 4px solid var(--sun);
+}
+
+.warnings p {
+  margin: 0 0 .4rem;
+}

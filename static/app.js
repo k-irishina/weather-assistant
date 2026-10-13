@@ -3,6 +3,7 @@ const PUSH_ENABLED = true;
 const els = {
   place: document.getElementById('place'),
   forecast: document.getElementById('forecast'),
+  warnings: document.getElementById('warnings'),
   rain: document.getElementById('rain'),
   rightNow: document.getElementById('right-now'),
   rightNowText: document.getElementById('right-now-text'),
@@ -78,6 +79,38 @@ async function setUpAreas() {
     })
   );
   els.areaSelect.onchange = () => changeArea(Number(els.areaSelect.value));
+}
+
+// Weather warnings for admins only for now
+let isAdminDevice = false;
+
+async function loadWarnings() {
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    const res = await fetch('/api/warnings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint, area: selectedArea, day: forecastDay }),
+    });
+    if (!res.ok) throw new Error(`server said ${res.status}`);
+    const { warnings } = await res.json();
+    els.warnings.replaceChildren(...warnings.flatMap(({ name, when, instruction }) => {
+      const title = document.createElement('p');
+      const strong = document.createElement('strong');
+      strong.textContent = `⚠️ ${name}`;
+      const time = document.createElement('span');
+      time.className = 'muted updated-note';
+      time.textContent = when;
+      title.append(strong, time);
+      const advice = document.createElement('p');
+      advice.className = 'muted';
+      advice.textContent = instruction;
+      return [title, advice];
+    }));
+    els.warnings.hidden = warnings.length === 0;
+  } catch (err) {
+    els.warnings.hidden = true;
+  }
 }
 
 async function changeArea(areaId) {
@@ -243,6 +276,7 @@ async function loadForecast(day = 'today') {
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
+    if (isAdminDevice) loadWarnings();
     forecastLoadedAt = Date.now();
   } catch (err) {
     els.place.textContent = '';
@@ -591,6 +625,8 @@ async function showSubscriptionOptions() {
     updatePushSummary();
 
     if (!isAdmin) return;
+    isAdminDevice = true;
+    loadWarnings();
     els.testButton.hidden = false;
     els.testButton.disabled = false;
     els.testButton.textContent = 'Send a test notification';

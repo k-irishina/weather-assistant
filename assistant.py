@@ -255,7 +255,7 @@ def compose_conditions_text(report: ForecastReport) -> str:
     return "\n".join(f'{item["emoji"]} {item["text"]}' for item in conditions(report))
 
 
-def format_forecast_text_short(report: ForecastReport) -> str:
+def format_forecast_text_short(report: ForecastReport, alerts=()) -> str:
     """For push notification messages to be readable"""
     temps = report["temperatures"]
     temp_part = "/".join(
@@ -263,7 +263,13 @@ def format_forecast_text_short(report: ForecastReport) -> str:
         for _, key, _ in temperature_periods
     )
 
-    lines = [f"{temp_part} {compact_precipitation_text(report)}"]
+    rain_alert = next((alert for alert in alerts if alert.kind == "rain"), None)
+    wind_alert = next((alert for alert in alerts if alert.kind == "wind"), None)
+    rain_part = f"⚠️ {rain_alert.name}" if rain_alert else compact_precipitation_text(report)
+    lines = [f"{temp_part} {rain_part}"]
+    # other warnings (ice, snow, flood etc) get their own line
+    for name in dict.fromkeys(alert.name for alert in alerts if alert.kind not in ("rain", "wind")):
+        lines.append(f"⚠️ {name}")
 
     if report["sunny_times"]:
         sunny_hours = bridge_gaps(sorted(report["sunny_times"]), constants.max_bridge_gap_hours)
@@ -274,7 +280,9 @@ def format_forecast_text_short(report: ForecastReport) -> str:
         if constants.wind_strength(reading.speed, reading.gust, reading.percentile_90)
         in (constants.MODERATE, constants.STRONG)
     })
-    if windy_hours:
+    if wind_alert:
+        lines.append(f"⚠️ {wind_alert.name}")
+    elif windy_hours:
         windy_hours = bridge_gaps(windy_hours, constants.max_bridge_gap_hours)
         lines.append(f"💨 {format_hours(windy_hours)}")
 

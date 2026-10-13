@@ -5,7 +5,7 @@ Telegram.
 """
 import logging
 from pathlib import Path
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -16,6 +16,7 @@ import app_config
 import area
 import assistant
 import db_connector as db
+import met_alerts
 import near_term_forecast
 import web_push
 
@@ -290,6 +291,33 @@ def whoami(body: Unsubscribe) -> dict:
         "morning_push_options": [_hour(at) for at in constants.morning_push_times],
         "weekend_morning_push": subscription.weekend_morning_push if subscription else True,
     }
+
+
+class WarningsRequest(BaseModel):
+    endpoint: str = Field(min_length=1)
+    area: Optional[int] = None
+    day: str = "today"
+
+
+@router.post("/warnings")
+def get_warnings(body: WarningsRequest) -> dict:
+    # admin devices only while warnings are being tested
+    subscription = db.find_web_subscription(body.endpoint)
+    if subscription is None or not subscription.is_admin:
+        raise HTTPException(status_code=403, detail="Not a test device.")
+    if body.day not in ("today", "tomorrow"):
+        raise HTTPException(status_code=400, detail="day must be 'today' or 'tomorrow'.")
+    chosen = resolve_area(body.area)
+    tz = chosen.region.timezone
+    day = chosen.region.today() + timedelta(days=1 if body.day == "tomorrow" else 0)
+    return {"warnings": [
+        {
+            "name": alert.name,
+            "when": f"{alert.starts.astimezone(tz):%a %H:%M} – {alert.ends.astimezone(tz):%a %H:%M}",
+            "instruction": alert.instruction,
+        }
+        for alert in met_alerts.alerts_for(chosen, day)
+    ]}
 
 
 @router.post("/test-push")

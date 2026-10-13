@@ -46,6 +46,22 @@ def get_sun_times(area: area.Area, date: date) -> Optional[tuple[datetime, datet
     sun = response.json()["properties"]
     return parse_utc(sun["sunrise"]["time"]), parse_utc(sun["sunset"]["time"])
 
+def get_metalerts(county: int) -> Optional[list[dict]]:
+    """MET's current land warnings in English. None if MET can't be reached."""
+    base_url = "https://api.met.no/weatherapi/metalerts/2.0/current.json"
+    query_params = {'county': f'{county:02d}', 'geographicDomain': 'land', 'lang': 'en'}
+    headers = {'User-Agent': user_agent}
+    try:
+        response = requests.get(base_url, params=query_params, headers=headers, timeout=timeout)
+    except requests.RequestException:
+        log.exception("Could not reach MetAlerts")
+        return None
+    if response.status_code != 200:
+        log.warning("MetAlerts for county %02d returned %s", county, response.status_code)
+        return None
+    return response.json().get("features", [])
+
+
 def get_nowcast(area: area.Area, last_modified=None):
     base_url = "https://api.met.no/weatherapi/nowcast/2.0/complete"
     query_params = {'lat': round(area.latitude, 4), 'lon': round(area.longtitude, 4)}

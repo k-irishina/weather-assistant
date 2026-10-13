@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 @dataclass(frozen=True)
 class Region:
     region_id: int
+    ssb_county: int # 0 - not applicable
     timezone: ZoneInfo
 
     def now(self) -> datetime:
@@ -23,13 +24,14 @@ class Area:
         self.region = region
 
 
-# broad areas, f.ex Asker and Fornebu is still considered Oslo
-OSLO = Region(region_id=101, timezone=ZoneInfo("Europe/Oslo"))
-RIGA = Region(region_id=102, timezone=ZoneInfo("Europe/Riga"))
-ROGALAND = Region(region_id=103, timezone=ZoneInfo("Europe/Oslo"))
+# broad areas: a region groups the places sharing a timezone and SSB county
+OSLO = Region(region_id=101, ssb_county=3, timezone=ZoneInfo("Europe/Oslo"))
+RIGA = Region(region_id=102, ssb_county=0, timezone=ZoneInfo("Europe/Riga"))
+ROGALAND = Region(region_id=103, ssb_county=11, timezone=ZoneInfo("Europe/Oslo"))
+AKERSHUS = Region(region_id=104, ssb_county=32, timezone=ZoneInfo("Europe/Oslo"))
 
 areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO), 
-          2: Area(59.9549, 11.0622, 2, 'Lillestrøm', OSLO),
+          2: Area(59.9549, 11.0622, 2, 'Lillestrøm', AKERSHUS),
           3: Area(56.96619506296, 24.134153506848776, 3, 'Riga - Centre', RIGA),
           4: Area(59.8731, 10.8089, 4, 'Oslo - Lambertseter', OSLO),
           5: Area(58.9594, 5.7333, 5, 'Stavanger', ROGALAND),
@@ -38,6 +40,6 @@ areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO),
           8: Area(59.9131, 10.7198, 8, 'Oslo - Vika', OSLO),
           9: Area(59.9192, 10.7091, 9, 'Oslo - Frogner', OSLO),
           10: Area(59.9621, 10.9234, 10, 'Oslo - Stovner', OSLO),
-          11: Area(59.8948, 10.6217, 11, 'Oslo - Fornebu', OSLO)
+          11: Area(59.8948, 10.6217, 11, 'Oslo - Fornebu', AKERSHUS)
         }
 
