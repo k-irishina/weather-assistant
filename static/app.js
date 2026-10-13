@@ -779,7 +779,7 @@ els.glitterToggle.onclick = () => {
 
 // "What's new" dot for people to see the changelog updates
 const SEEN_CHANGES_KEY = 'weather-assistant-seen-changes';
-const RECENT_CHANGES_SHOWN = 5;
+const RECENT_CHANGES_DAYS = 14;
 let changelog = [];
 
 function newestChange() {
@@ -815,13 +815,15 @@ async function loadChangelog() {
   }
   if (!changelog.length) return;
 
-  const parts = [changeList(changelog.slice(0, RECENT_CHANGES_SHOWN))];
-  if (changelog.length > RECENT_CHANGES_SHOWN) {
+  const cutoff = new Date(Date.now() - RECENT_CHANGES_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const recentCount = Math.max(1, changelog.filter((change) => change.date >= cutoff).length);
+  const parts = [changeList(changelog.slice(0, recentCount))];
+  if (changelog.length > recentCount) {
     const older = document.createElement('details');
     older.className = 'changelog-older';
     const summary = document.createElement('summary');
     summary.textContent = 'Older changes';
-    older.append(summary, changeList(changelog.slice(RECENT_CHANGES_SHOWN)));
+    older.append(summary, changeList(changelog.slice(recentCount)));
     parts.push(older);
   }
   els.changelogEntries.replaceChildren(...parts);

@@ -60,8 +60,12 @@ def decide(
         log.debug("No baseline covering %s, staying quiet", sorted(hours))
         return None
 
-    if max(promised) >= constants.min_precipitation_probability:
-        # the morning forecast already told them about this hour
+    forecast_rain = {hour for hour, chance in baseline.items()
+                     if chance >= constants.min_precipitation_probability}
+    one_hour = timedelta(hours=1)
+    # a single dry hour between two rainy periods counts as forecast too
+    gaps = {hour + one_hour for hour in forecast_rain if hour + 2 * one_hour in forecast_rain}
+    if hours & (forecast_rain | gaps):
         return None
 
     return alert._replace(kind=UNFORESEEN)

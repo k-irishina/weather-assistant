@@ -48,6 +48,7 @@ def fetch_forecast_for_area_id(area_id):
         db.record_forecast_check(user_area, parse_http_date(expires) if expires else None)
         return
     elif response.status_code != 200:
+        log.warning("Forecast for %s returned %s", user_area.display_name, response.status_code)
         return
     
     log.info('Response from API: ' + str(response.status_code))

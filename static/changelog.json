@@ -1,5 +1,9 @@
 [
   {
+    "date": "2026-10-13",
+    "text": "Missed rain alert improvements."
+  },
+  {
     "date": "2026-10-08",
     "text": "Not showing moderate wind if it only happens in late night hours to make forecast more relevant."
   },
