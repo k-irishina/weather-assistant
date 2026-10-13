@@ -120,18 +120,26 @@ def told_with_radar(
     return near_term_forecast.apply_radar(baseline, near_term_forecast.radar_hours(radar))
 
 
+def duration_text(minutes: int) -> str:
+    """110 -> "1h 50min", 120 -> "2h", 45 -> "45min"."""
+    hours, rest = minutes // 60, minutes % 60
+    if not hours:
+        return f"{rest}min"
+    return f"{hours}h {rest}min" if rest else f"{hours}h"
+
+
 def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
     timezone = area_obj.region.timezone
     when = near_term_forecast.local_hhmm(alert.starts_at, timezone)
     if alert.kind == HEAVY:
         title = "Heavy rain incoming"
         body = (f"{alert.peak_rate:g} mm/h from about {when} in "
-                f"{area_obj.display_name}, for around {alert.minutes} minutes.")
+                f"{area_obj.display_name}, for around {duration_text(alert.minutes)}.")
     else:
         title = "Rain the forecast missed"
         body = (f"Rain from about {when} in "
                 f"{area_obj.display_name} ({alert.peak_rate:g} mm/h, around "
-                f"{alert.minutes} minutes). This morning's forecast did not "
+                f"{duration_text(alert.minutes)}). This morning's forecast did not "
                 "call for it.")
     return title, body
 
