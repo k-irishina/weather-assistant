@@ -709,3 +709,10 @@ body.glitter-mode #about-toggle.has-news::after {
 .warnings p {
   margin: 0 0 .4rem;
 }
+
+.warning-icon {
+  width: 1.5em;
+  height: 1.5em;
+  margin-right: .4rem;
+  vertical-align: -0.35em;
+}

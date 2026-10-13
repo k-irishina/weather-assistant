@@ -66,6 +66,7 @@ CREATE TABLE rain_alert_log(
              sent_at timestamptz NOT NULL DEFAULT now(),
              kind text NOT NULL,
              starts_at timestamptz NOT NULL,
+             ends_at timestamptz,
              peak_rate numeric NOT NULL,
              recipients integer NOT NULL DEFAULT 0);
 

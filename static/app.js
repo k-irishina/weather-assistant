@@ -94,10 +94,15 @@ async function loadWarnings() {
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const { warnings } = await res.json();
-    els.warnings.replaceChildren(...warnings.flatMap(({ name, when, instruction }) => {
+    els.warnings.replaceChildren(...warnings.flatMap(({ name, icon, when, instruction }) => {
       const title = document.createElement('p');
+      const img = document.createElement('img');
+      img.src = icon;
+      img.alt = '';
+      img.className = 'warning-icon';
       const strong = document.createElement('strong');
-      strong.textContent = `⚠️ ${name}`;
+      strong.textContent = name;
+      title.append(img);
       const time = document.createElement('span');
       time.className = 'muted updated-note';
       time.textContent = when;

@@ -39,7 +39,8 @@ strong_gust_speed = 9.0
 drizzle_rate = 0.1
 rain_starting_rate = 0.5
 moderate_rain_rate = 2.5
-heavy_rain_rate = 4.0
+heavy_rain_rate = 4.4
+very_heavy_rain_rate = 6.0
 min_wet_steps = 2
 
 min_shown_uv_index = 2.5
@@ -60,7 +61,7 @@ radar_pause_end = 5
 radar_max_age_minutes = 25
 radar_trusted_dry_minutes = 90
 
-rain_alert_cooldown_minutes = 40
+rain_episode_gap_minutes = 30
 
 CALM = "calm"
 MODERATE = "moderate"

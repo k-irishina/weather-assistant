@@ -11,6 +11,9 @@ SEVERITIES = ("Moderate", "Severe", "Extreme")
 class Alert(NamedTuple):
     name: str  # eventAwarenessName, f.ex "Heavy rain"
     kind: str  # awareness_type, "wind","rain", etc
+    event: str  # MET's event, lowercased
+    color: str  # riskMatrixColor, lowercased
+    severity: str  # "Moderate", "Severe" or "Extreme"
     starts: datetime  # UTC
     ends: datetime  # UTC
     instruction: str
@@ -51,6 +54,9 @@ def to_alert(feature: dict) -> Alert:
     return Alert(
         name=properties["eventAwarenessName"],
         kind=kind,
+        event=properties.get("event", "").lower(),
+        color=properties.get("riskMatrixColor", "yellow").lower(),
+        severity=properties.get("severity", ""),
         starts=starts,
         ends=ends,
         instruction=properties.get("instruction", "").strip(),

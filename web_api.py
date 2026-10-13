@@ -86,6 +86,23 @@ def _temperature(value) -> Optional[int]:
 WEATHER_ICON_DIR = Path(__file__).resolve().parent / "static" / "icons" / "weather-icons"
 
 
+ALERT_ICON_DIR = Path(__file__).resolve().parent / "static" / "icons" / "weather-alert-icons"
+# best-effort matching of MET's eventAwarenessName to an icon
+ALERT_ICON_ALIASES = {"gale": "wind", "icing": "ice", "blowingsnow": "snow", "snowice": "snow",
+                      "thunderstorm": "lightning", "flooding": "flood"}
+
+
+def _alert_icon(alert: met_alerts.Alert) -> str:
+    if alert.severity == "Extreme":
+        return "/icons/weather-alert-icons/icon-warning-extreme.svg"
+    awareness = alert.kind.replace("-", "")
+    for name in (alert.event, ALERT_ICON_ALIASES.get(alert.event),
+                 awareness, ALERT_ICON_ALIASES.get(awareness), "generic"):
+        if name and (ALERT_ICON_DIR / f"icon-warning-{name}-{alert.color}.svg").is_file():
+            return f"/icons/weather-alert-icons/icon-warning-{name}-{alert.color}.svg"
+    return "/icons/weather-alert-icons/icon-warning-generic-yellow.svg"
+
+
 def _symbol_icon(symbol_code: Optional[str]) -> Optional[str]:
     if not symbol_code:
         return None
@@ -313,6 +330,7 @@ def get_warnings(body: WarningsRequest) -> dict:
     return {"warnings": [
         {
             "name": alert.name,
+            "icon": _alert_icon(alert),
             "when": f"{alert.starts.astimezone(tz):%a %H:%M} – {alert.ends.astimezone(tz):%a %H:%M}",
             "instruction": alert.instruction,
         }

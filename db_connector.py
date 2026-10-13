@@ -846,12 +846,12 @@ def morning_baseline_precipitation(
     }
 
 
-def last_rain_alert_at(area_obj: area.Area) -> Optional[datetime]:
+def last_rain_alert(area_obj: area.Area) -> Optional[tuple[str, datetime, datetime]]:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT sent_at
+                SELECT kind, starts_at, COALESCE(ends_at, starts_at)
                 FROM rain_alert_log
                 WHERE area = %s
                 ORDER BY sent_at DESC
@@ -859,22 +859,21 @@ def last_rain_alert_at(area_obj: area.Area) -> Optional[datetime]:
                 """,
                 (area_obj.id,),
             )
-            row = cur.fetchone()
-            return row[0] if row else None
+            return cur.fetchone()
 
 
 def log_rain_alert(
-    area_obj: area.Area, kind: str, starts_at: datetime, peak_rate: float,
-    recipients: int,
+    area_obj: area.Area, kind: str, starts_at: datetime, ends_at: datetime,
+    peak_rate: float, recipients: int,
 ) -> None:
     with connpool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO rain_alert_log(area, kind, starts_at, peak_rate, recipients)
-                VALUES(%s, %s, %s, %s, %s)
+                INSERT INTO rain_alert_log(area, kind, starts_at, ends_at, peak_rate, recipients)
+                VALUES(%s, %s, %s, %s, %s, %s)
                 """,
-                (area_obj.id, kind, starts_at, peak_rate, recipients),
+                (area_obj.id, kind, starts_at, ends_at, peak_rate, recipients),
             )
             conn.commit()
 

@@ -48,27 +48,36 @@ def decide(
         minutes=len(run) * near_term_forecast.STEP_MINUTES,
     )
 
-    if alert.peak_rate >= constants.heavy_rain_rate:
+    hours = {step.time.replace(minute=0, second=0, microsecond=0) for step in run}
+    covered = baseline is not None and any(hour in baseline for hour in hours)
+    forecast_called = covered and bool(hours & forecast_rain_hours(baseline))
+
+    heavy_periods = near_term_forecast.rain_periods(run, constants.heavy_rain_rate)
+    heavy = any(len(period) >= constants.min_wet_steps for period in heavy_periods)
+    if heavy and (not forecast_called or alert.peak_rate >= constants.very_heavy_rain_rate):
         return alert
 
-    if baseline is None:
+    if not covered or forecast_called:
         return None
-
-    hours = {step.time.replace(minute=0, second=0, microsecond=0) for step in run}
-    promised = [baseline[hour] for hour in hours if hour in baseline]
-    if not promised:
-        log.debug("No baseline covering %s, staying quiet", sorted(hours))
-        return None
-
-    forecast_rain = {hour for hour, chance in baseline.items()
-                     if chance >= constants.min_precipitation_probability}
-    one_hour = timedelta(hours=1)
-    # a single dry hour between two rainy periods counts as forecast too
-    gaps = {hour + one_hour for hour in forecast_rain if hour + 2 * one_hour in forecast_rain}
-    if hours & (forecast_rain | gaps):
-        return None
-
     return alert._replace(kind=UNFORESEEN)
+
+
+def forecast_rain_hours(baseline: dict[datetime, float]) -> set[datetime]:
+    #Hours the morning forecast called rain, plus single dry hours between two of them
+    rainy = {hour for hour, chance in baseline.items()
+             if chance >= constants.min_precipitation_probability}
+    one_hour = timedelta(hours=1)
+    gaps = {hour + one_hour for hour in rainy if hour + 2 * one_hour in rainy}
+    return rainy | gaps
+
+
+def same_episode(alert: RainAlert, last_kind: str, last_starts: datetime, last_ends: datetime) -> bool:
+    # to avoid alerting twice for the same rain
+    if alert.kind == HEAVY and last_kind == UNFORESEEN:
+        return False
+    gap = timedelta(minutes=constants.rain_episode_gap_minutes)
+    alert_ends = alert.starts_at + timedelta(minutes=alert.minutes)
+    return alert.starts_at <= last_ends + gap and alert_ends >= last_starts
 
 
 WATCHED_AREAS = [
@@ -167,17 +176,15 @@ def check_area_for_rain(area_obj: area.Area) -> Optional[RainAlert]:
     if alert is None:
         return None
 
-    last_sent = db.last_rain_alert_at(area_obj)
-    cooldown = timedelta(minutes=constants.rain_alert_cooldown_minutes)
-    if last_sent is not None and local_now - last_sent < cooldown:
-        log.info("Rain alert for %s suppressed, last one was %s",
-                 area_obj.display_name, last_sent)
+    last = db.last_rain_alert(area_obj)
+    if last is not None and same_episode(alert, *last):
+        log.info("Rain alert for %s suppressed, same rain as the last alert", area_obj.display_name)
         return None
 
     title, body = alert_text(alert, area_obj)
     recipients = web_push.send_to_rain_subscribers(area_obj, title, body)
-    db.log_rain_alert(
-        area_obj, alert.kind, alert.starts_at, alert.peak_rate, recipients)
+    db.log_rain_alert(area_obj, alert.kind, alert.starts_at,
+                      alert.starts_at + timedelta(minutes=alert.minutes), alert.peak_rate, recipients)
     return alert
 
 
