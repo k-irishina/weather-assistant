@@ -112,9 +112,9 @@ body.photo-mode::before {
 body.photo-mode .card,
 body.photo-mode header,
 body.photo-mode footer {
-  background: color-mix(in srgb, var(--card) 70%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   border-radius: .75rem;
 }
 
