@@ -323,6 +323,7 @@ const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
 
 let photoLinks = null;
 let photoToShow = null;
+const pickedPhotos = {};
 
 function minutesOf(hhmm) {
   const [hours, minutes] = hhmm.split(':').map(Number);
@@ -378,7 +379,9 @@ async function showPhoto() {
       return;
     }
   }
-  const name = pickPhoto(Object.keys(photoLinks), photoToShow);
+  const key = JSON.stringify(photoToShow);
+  pickedPhotos[key] ??= pickPhoto(Object.keys(photoLinks), photoToShow);
+  const name = pickedPhotos[key];
   document.body.style.setProperty('--photo', name ? `url("${photoLinks[name]}")` : 'none');
 }
 
