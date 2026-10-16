@@ -26,7 +26,8 @@ const els = {
   morningTimeSelect: document.getElementById('morning-time-select'),
   weekendMorning: document.getElementById('weekend-morning'),
   weekendMorningToggle: document.getElementById('weekend-morning-toggle'),
-  glitterToggle: document.getElementById('glitter-toggle'),
+  themeToggle: document.getElementById('theme-toggle'),
+  themeMenu: document.getElementById('theme-menu'),
   inApp: document.getElementById('in-app'),
   inAppText: document.getElementById('in-app-text'),
   inAppOpen: document.getElementById('in-app-open'),
@@ -281,6 +282,13 @@ async function loadForecast(day = 'today') {
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
+    const firstSymbol = Object.values(data.temperatures).find((period) => period.symbol_code)?.symbol_code;
+    photoToShow = {
+      month: MONTH_NAMES[Number(data.day.slice(5, 7)) - 1],
+      part: dayPart(minutesOf(data.generated_at.slice(11, 16)), minutesOf(data.sunrise), minutesOf(data.sunset)),
+      sky: skyOf(firstSymbol),
+    };
+    showPhoto();
     if (isAdminDevice) loadWarnings();
     forecastLoadedAt = Date.now();
   } catch (err) {
@@ -289,6 +297,89 @@ async function loadForecast(day = 'today') {
   } finally {
     els.forecast.setAttribute('aria-busy', 'false');
   }
+}
+
+function skyOf(symbolCode) {
+  if (!symbolCode) return '';
+  if (symbolCode.includes('snow')) return 'snow';
+  if (/rain|sleet|thunder/.test(symbolCode)) return 'rain';
+  if (symbolCode.startsWith('clearsky') || symbolCode.startsWith('fair')) return 'clear';
+  if (symbolCode.startsWith('partlycloudy')) return 'partly';
+  return 'cloudy';
+}
+
+const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december'];
+const DAY_PARTS = ['morning', 'day', 'sunset', 'evening', 'night'];
+const SKY_WORDS = {
+  clear: ['clear', 'sunny'],
+  partly: ['partly', 'clear', 'cloudy'],
+  cloudy: ['cloudy'],
+  rain: ['rainy'],
+  snow: ['snowy'],
+};
+const ALL_SKY_WORDS = Object.values(SKY_WORDS).flat();
+const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+
+let photoLinks = null;
+let photoToShow = null;
+
+function minutesOf(hhmm) {
+  const [hours, minutes] = hhmm.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// "sunset" around sunset, the rest by the clock
+function dayPart(now, sunrise, sunset) {
+  if (now >= sunset - 45 && now < sunset + 30) return 'sunset';
+  if (now >= sunrise - 30 && now < 11 * 60) return 'morning';
+  if (now >= 22 * 60 || now < sunrise - 30) return 'night';
+  if (now < sunset) return 'day';
+  return 'evening';
+}
+
+function photoScore(name, { month, part, sky }) {
+  const dot = name.lastIndexOf('.');
+  if (!PHOTO_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase())) return -1;
+  const words = name.slice(0, dot).toLowerCase().split('-');
+  const nameMonth = words.find((word) => MONTH_NAMES.includes(word));
+  const namePart = words.find((word) => DAY_PARTS.includes(word));
+  const conditions = words.filter((word) => ALL_SKY_WORDS.includes(word));
+  const fittingWords = SKY_WORDS[sky] ?? [];
+
+  if (namePart && namePart !== part) return -1;
+  if (conditions.length && !conditions.some((word) => fittingWords.includes(word))) return -1;
+
+  // another month's photo only when nothing else fits
+  let score = 0;
+  if (nameMonth === month) score += 4;
+  if (!nameMonth) score += 2;
+  if (namePart) score += 1;
+  if (conditions.length || sky === 'cloudy') score += 1;
+  return score;
+}
+
+// The best fitting photo, a random one of them when several fit as well
+function pickPhoto(names, wanted) {
+  const scores = names.map((name) => photoScore(name, wanted));
+  const best = Math.max(...scores);
+  if (best < 0) return null;
+  const bestNames = names.filter((name, index) => scores[index] === best);
+  return bestNames[Math.floor(Math.random() * bestNames.length)];
+}
+
+async function showPhoto() {
+  if (!document.body.classList.contains('photo-mode') || !photoToShow) return;
+  if (photoLinks === null) {
+    try {
+      const res = await fetch('/api/backgrounds');
+      photoLinks = (await res.json()).files;
+    } catch (err) {
+      return;
+    }
+  }
+  const name = pickPhoto(Object.keys(photoLinks), photoToShow);
+  document.body.style.setProperty('--photo', name ? `url("${photoLinks[name]}")` : 'none');
 }
 
 function dayFlipButton(label, targetDay) {
@@ -631,6 +722,7 @@ async function showSubscriptionOptions() {
 
     if (!isAdmin) return;
     isAdminDevice = true;
+    els.themeMenu.querySelector('[data-theme-option="photo"]').hidden = false;
     loadWarnings();
     els.testButton.hidden = false;
     els.testButton.disabled = false;
@@ -797,26 +889,49 @@ async function unsubscribe() {
   }
 }
 
+const THEME_KEY = 'weather-assistant-theme';
 const GLITTER_KEY = 'weather-assistant-glitter';
+const themeOptions = els.themeMenu.querySelectorAll('[data-theme-option]');
 
-function setGlitter(enabled) {
-  document.body.classList.toggle('glitter-mode', enabled);
-  els.glitterToggle.setAttribute('aria-pressed', String(enabled));
+function setTheme(theme) {
+  document.body.classList.toggle('glitter-mode', theme === 'glitter');
+  document.body.classList.toggle('photo-mode', theme === 'photo');
+  showPhoto();
+  for (const option of themeOptions) {
+    const selected = option.dataset.themeOption === theme;
+    option.setAttribute('aria-pressed', String(selected));
+    if (selected) els.themeToggle.textContent = option.textContent;
+  }
+}
+
+function showThemeMenu(open) {
+  els.themeMenu.hidden = !open;
+  els.themeToggle.setAttribute('aria-expanded', String(open));
 }
 
 try {
-  setGlitter(localStorage.getItem(GLITTER_KEY) === 'on');
+  const oldGlitter = localStorage.getItem(GLITTER_KEY) === 'on' ? 'glitter' : 'plain';
+  setTheme(localStorage.getItem(THEME_KEY) ?? oldGlitter);
 } catch (err) {
+  setTheme('plain');
 }
 
-els.glitterToggle.onclick = () => {
-  const enabled = !document.body.classList.contains('glitter-mode');
-  setGlitter(enabled);
-  try {
-    localStorage.setItem(GLITTER_KEY, enabled ? 'on' : 'off');
-  } catch (err) {
-  }
-};
+els.themeToggle.onclick = () => showThemeMenu(els.themeMenu.hidden);
+
+for (const option of themeOptions) {
+  option.onclick = () => {
+    setTheme(option.dataset.themeOption);
+    showThemeMenu(false);
+    try {
+      localStorage.setItem(THEME_KEY, option.dataset.themeOption);
+    } catch (err) {
+    }
+  };
+}
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.theme-picker')) showThemeMenu(false);
+});
 
 // "What's new" dot for people to see the changelog updates
 const SEEN_CHANGES_KEY = 'weather-assistant-seen-changes';

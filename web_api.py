@@ -16,6 +16,7 @@ import app_config
 import area
 import assistant
 import db_connector as db
+import media_bucket
 import met_alerts
 import near_term_forecast
 import web_push
@@ -205,6 +206,13 @@ def get_near_term_forecast(area: Optional[int] = None) -> dict:
     if series is not None:
         series = near_term_forecast.without_past_steps(series, datetime.now(timezone.utc))
     return near_term_forecast.page_payload(series, chosen)
+
+
+@router.get("/backgrounds")
+def get_backgrounds() -> dict:
+    if not media_bucket.configured():
+        return {"files": {}}
+    return {"files": media_bucket.background_links()}
 
 
 @router.get("/areas")

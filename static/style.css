@@ -95,12 +95,48 @@ body.glitter-mode .place {
   text-shadow: 0 0 2px var(--bg), 0 0 5px var(--bg), 0 0 8px var(--bg);
 }
 
-body.glitter-mode #glitter-toggle[aria-pressed="true"] {
+body.glitter-mode #theme-toggle {
   box-shadow: 0 0 10px 2px var(--accent);
 }
 
 body.glitter-mode .temps img {
   filter: hue-rotate(300deg) saturate(1.4);
+}
+
+/* photo theme */
+body.photo-mode::before {
+  background: var(--photo, none) center / cover no-repeat;
+  opacity: 1;
+}
+
+body.photo-mode .card,
+body.photo-mode header,
+body.photo-mode footer {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-radius: .75rem;
+}
+
+/* keeps the theme menu above the frosted cards below */
+body.photo-mode header {
+  z-index: 1;
+}
+
+body.photo-mode header,
+body.photo-mode footer {
+  padding-top: .75rem;
+  padding-bottom: .75rem;
+  padding-left: 1rem;
+}
+
+body.photo-mode footer {
+  padding-right: 1rem;
+}
+
+body.photo-mode .header-buttons {
+  top: .5rem;
+  right: .5rem;
 }
 
 main {
@@ -199,10 +235,33 @@ button.secondary {
 }
 
 #about-toggle[aria-expanded="true"],
-#glitter-toggle[aria-pressed="true"] {
+#theme-toggle[aria-expanded="true"],
+.theme-menu [aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg);
+}
+
+.theme-picker {
+  position: relative;
+}
+
+.theme-menu {
+  position: absolute;
+  top: 2.6rem;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  gap: .3rem;
+  padding: .3rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.theme-menu[hidden],
+.theme-menu [hidden] {
+  display: none;
 }
 
 ol, ul {

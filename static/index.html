@@ -19,8 +19,16 @@
       <div class="header-buttons">
         <button id="about-toggle" class="icon-button" type="button" aria-expanded="false" aria-controls="about"
           aria-label="About this app" title="About">?</button>
-        <button id="glitter-toggle" class="icon-button" type="button" aria-pressed="false"
-          aria-label="Toggle glitter mode" title="Glitter mode">✨</button>
+        <div class="theme-picker">
+          <button id="theme-toggle" class="icon-button" type="button" aria-expanded="false" aria-controls="theme-menu"
+            aria-label="Choose a theme" title="Theme">🔘</button>
+          <div id="theme-menu" class="theme-menu" hidden>
+            <button class="icon-button" type="button" data-theme-option="plain" aria-label="Plain" title="Plain">🔘</button>
+            <button class="icon-button" type="button" data-theme-option="glitter" aria-label="Glitter" title="Glitter">✨</button>
+            <button class="icon-button" type="button" data-theme-option="photo" aria-label="Photo background"
+              title="Photo background" hidden>📷</button>
+          </div>
+        </div>
       </div>
       <h1>Weather Assistant</h1>
       <p class="place" id="place">Loading…</p>

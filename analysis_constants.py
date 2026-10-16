@@ -39,7 +39,7 @@ strong_gust_speed = 9.0
 drizzle_rate = 0.1
 rain_starting_rate = 0.5
 moderate_rain_rate = 2.5
-heavy_rain_rate = 4.4
+heavy_rain_rate = 4.3
 very_heavy_rain_rate = 6.0
 min_wet_steps = 2
 

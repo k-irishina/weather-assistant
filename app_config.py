@@ -62,6 +62,13 @@ _web.setdefault("host", "0.0.0.0")
 _web["port"] = int(os.environ.get("PORT") or _web.get("port") or 8000)
 web = _web
 
+media_bucket = {
+    "name": os.environ.get("BUCKET_NAME"),  # S3 name
+    "endpoint": os.environ.get("BUCKET_ENDPOINT"),
+    "access_key_id": os.environ.get("BUCKET_ACCESS_KEY_ID"),
+    "secret_access_key": os.environ.get("BUCKET_SECRET_ACCESS_KEY"),
+}
+
 log_level = (os.environ.get("LOG_LEVEL") or config.get("log-level") or "DEBUG").upper()
 
 def _missing_settings() -> list[str]:
