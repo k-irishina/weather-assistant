@@ -388,8 +388,10 @@ def hour_runs(hours) -> list:
 
 
 def significant_moderate_wind_hours(hours, min_run_hours: int) -> list:
-    daytime = [hour for hour in hours if hour >= constants.moderate_wind_mentioned_from]
-    return [hour for run in hour_runs(daytime) if len(run) >= min_run_hours for hour in run]
+    significant = [hour for run in hour_runs(hours) if len(run) >= min_run_hours for hour in run]
+    if not any(hour >= constants.moderate_wind_mentioned_from for hour in significant):
+        return []
+    return significant
 
 
 def bridge_gaps(hours, max_gap_hours: int, blocked=frozenset()) -> list:

@@ -251,7 +251,7 @@ async function loadForecast(day = 'today') {
     const data = await res.json();
     forecastDay = day;
 
-    els.place.textContent = `${data.area} · 🌅 ${data.sunrise}, 🌇 ${data.sunset}`;
+    els.place.textContent = `${data.area} · 🌅 ${data.sunrise} 🌇 ${data.sunset}`;
 
     const dayLabel = shortDate(data.day);
     const heading = document.createElement('p');
@@ -282,13 +282,15 @@ async function loadForecast(day = 'today') {
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
-    const firstSymbol = Object.values(data.temperatures).find((period) => period.symbol_code)?.symbol_code;
-    photoToShow = {
-      month: MONTH_NAMES[Number(data.day.slice(5, 7)) - 1],
-      part: dayPart(minutesOf(data.generated_at.slice(11, 16)), minutesOf(data.sunrise), minutesOf(data.sunset)),
-      sky: skyOf(firstSymbol),
-    };
-    showPhoto();
+    if (day === 'today') {
+      const firstSymbol = Object.values(data.temperatures).find((period) => period.symbol_code)?.symbol_code;
+      photoToShow = {
+        month: MONTH_NAMES[Number(data.day.slice(5, 7)) - 1],
+        part: dayPart(minutesOf(data.generated_at.slice(11, 16)), minutesOf(data.sunrise), minutesOf(data.sunset)),
+        sky: skyOf(firstSymbol),
+      };
+      showPhoto();
+    }
     if (isAdminDevice) loadWarnings();
     forecastLoadedAt = Date.now();
   } catch (err) {
@@ -725,7 +727,6 @@ async function showSubscriptionOptions() {
 
     if (!isAdmin) return;
     isAdminDevice = true;
-    els.themeMenu.querySelector('[data-theme-option="photo"]').hidden = false;
     loadWarnings();
     els.testButton.hidden = false;
     els.testButton.disabled = false;

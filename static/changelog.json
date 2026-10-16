@@ -1,5 +1,9 @@
 [
   {
+    "date": "2026-10-16",
+    "text": "New theme with my own photos that follow the time of day and weather (experimental!)"
+  },
+  {
     "date": "2026-10-13",
     "text": "Rain alert improvements and preventing heavy rain spam. Work started on meteorological alerts!"
   },
