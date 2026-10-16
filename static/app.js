@@ -315,6 +315,7 @@ const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june',
 const DAY_PARTS = ['morning', 'day', 'sunset', 'evening', 'night'];
 const SKY_WORDS = {
   clear: ['clear', 'sunny'],
+  sunny: ['sunny'],
   partly: ['partly', 'clear', 'cloudy'],
   cloudy: ['cloudy'],
   rain: ['rainy'],
