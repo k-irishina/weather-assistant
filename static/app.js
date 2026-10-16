@@ -315,7 +315,6 @@ const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june',
 const DAY_PARTS = ['morning', 'day', 'sunset', 'evening', 'night'];
 const SKY_WORDS = {
   clear: ['clear', 'sunny'],
-  sunny: ['sunny'],
   partly: ['partly', 'clear', 'cloudy'],
   cloudy: ['cloudy'],
   rain: ['rainy'],
@@ -333,11 +332,11 @@ function minutesOf(hhmm) {
   return hours * 60 + minutes;
 }
 
-// "sunset" around sunset, the rest by the clock
+// "sunset" around sunset, "night" 90 min after it
 function dayPart(now, sunrise, sunset) {
   if (now >= sunset - 45 && now < sunset + 30) return 'sunset';
   if (now >= sunrise - 30 && now < 11 * 60) return 'morning';
-  if (now >= 22 * 60 || now < sunrise - 30) return 'night';
+  if (now >= sunset + 90 || now < sunrise - 30) return 'night';
   if (now < sunset) return 'day';
   return 'evening';
 }
