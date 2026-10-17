@@ -358,7 +358,7 @@ function photoScore(name, { month, part, sky }) {
   if (nameMonth === month) score += 4;
   if (!nameMonth) score += 2;
   if (namePart) score += 1;
-  if (conditions.length || sky === 'cloudy') score += 1;
+  if (conditions.length || sky === 'cloudy' || part === 'night') score += 1;
   return score;
 }
 
@@ -920,7 +920,39 @@ try {
   setTheme('plain');
 }
 
-els.themeToggle.onclick = () => showThemeMenu(els.themeMenu.hidden);
+// in photo mode, holding the theme button will reveal the picture
+const PEEK_DELAY_MS = 400;
+let peekTimer = null;
+let peeked = false;
+
+els.themeToggle.addEventListener('pointerdown', (event) => {
+  peeked = false;
+  if (!document.body.classList.contains('photo-mode')) return;
+  // keeps getting pointerup while the button is hidden
+  els.themeToggle.setPointerCapture(event.pointerId);
+  peekTimer = setTimeout(() => {
+    peeked = true;
+    showThemeMenu(false);
+    document.body.classList.add('photo-peek');
+  }, PEEK_DELAY_MS);
+});
+
+function endPeek() {
+  clearTimeout(peekTimer);
+  document.body.classList.remove('photo-peek');
+}
+
+els.themeToggle.addEventListener('pointerup', endPeek);
+els.themeToggle.addEventListener('pointercancel', endPeek);
+els.themeToggle.addEventListener('contextmenu', (event) => event.preventDefault());
+
+els.themeToggle.onclick = () => {
+  if (peeked) {
+    peeked = false;
+    return;
+  }
+  showThemeMenu(els.themeMenu.hidden);
+};
 
 for (const option of themeOptions) {
   option.onclick = () => {

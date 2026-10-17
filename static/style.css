@@ -144,6 +144,18 @@ main {
   max-width: 34rem;
   margin: 0 auto;
   padding: 1.5rem 1rem 3rem;
+  transition: opacity .2s ease;
+}
+
+body.photo-peek main {
+  opacity: 0;
+}
+
+#theme-toggle {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 header {
