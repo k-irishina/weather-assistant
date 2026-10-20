@@ -296,12 +296,8 @@ async function loadForecast(day = 'today') {
 const PHOTO_REFRESH_MS = 10 * 60 * 1000;
 let photoAskedFor = '';
 
-function stopWaitingForPhoto() {
-  document.documentElement.classList.remove('photo-loading');
-}
-
 async function showPhoto() {
-  if (!document.body.classList.contains('photo-mode')) return stopWaitingForPhoto();
+  if (!document.body.classList.contains('photo-mode')) return;
   const areaId = selectedArea ?? rememberedArea();
   const timeSlot = Math.floor(Date.now() / PHOTO_REFRESH_MS);
   if (`${areaId}-${timeSlot}` === photoAskedFor) return;
@@ -313,18 +309,16 @@ async function showPhoto() {
     photoAskedFor = `${area}-${timeSlot}`;
     if (!link) {
       document.body.style.setProperty('--photo', 'none');
-      return stopWaitingForPhoto();
+      return;
     }
     // shown once downloaded
     const image = new Image();
     image.onload = image.onerror = () => {
       document.body.style.setProperty('--photo', `url("${link}")`);
-      stopWaitingForPhoto();
     };
     image.src = link;
   } catch (err) {
     photoAskedFor = '';
-    stopWaitingForPhoto();
   }
 }
 
