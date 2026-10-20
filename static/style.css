@@ -133,6 +133,7 @@ body.photo-mode footer {
 
 body.photo-mode footer {
   padding: .4rem 1rem;
+  margin-top: 1rem;
 }
 
 body.photo-mode footer p {
@@ -200,7 +201,12 @@ h2 {
 .place {
   margin: .25rem 0 0;
   color: var(--ink);
+  font-size: .9rem;
   font-weight: 600;
+}
+
+.nowrap {
+  white-space: nowrap;
 }
 
 .muted {

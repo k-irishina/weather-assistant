@@ -251,7 +251,13 @@ async function loadForecast(day = 'today') {
     const data = await res.json();
     forecastDay = day;
 
-    els.place.textContent = `${data.area} · 🌅 ${data.sunrise} 🌇 ${data.sunset}`;
+    const sunrise = document.createElement('span');
+    sunrise.className = 'nowrap';
+    sunrise.textContent = `🌅 ${data.sunrise}`;
+    const sunset = document.createElement('span');
+    sunset.className = 'nowrap';
+    sunset.textContent = `🌇 ${data.sunset}`;
+    els.place.replaceChildren(`${data.area} · `, sunrise, ' ', sunset);
 
     const dayLabel = shortDate(data.day);
     const heading = document.createElement('p');
