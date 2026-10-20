@@ -15,10 +15,12 @@ import analysis_constants as constants
 import app_config
 import area
 import assistant
+import background_photo_picker
 import db_connector as db
 import media_bucket
 import met_alerts
 import near_term_forecast
+import retrieve_complete_forecast as rcf
 import web_push
 
 log = logging.getLogger(__name__)
@@ -208,11 +210,19 @@ def get_near_term_forecast(area: Optional[int] = None) -> dict:
     return near_term_forecast.page_payload(series, chosen)
 
 
-@router.get("/backgrounds")
-def get_backgrounds() -> dict:
+@router.get("/background")
+def get_background(area: Optional[int] = None) -> dict:
+    chosen = resolve_area(area)
     if not media_bucket.configured():
-        return {"files": {}}
-    return {"files": media_bucket.background_links()}
+        return {"area": chosen.id, "link": None}
+    local_now = chosen.region.now()
+    symbol = db.hourly_symbols(chosen, local_now.date()).get(time(local_now.hour), "")
+    sun_times = rcf.fetch_sunset_sunrise_for_area(chosen)
+    links = media_bucket.background_links()
+    name = background_photo_picker.pick_photo(
+        links, symbol, local_now, sun_times["sunrise_time"], sun_times["sunset_time"]
+    )
+    return {"area": chosen.id, "link": links.get(name)}
 
 
 @router.get("/areas")

@@ -5,12 +5,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Weather Assistant</title>
+  <meta name="description" content="Perhaps, the most accurate short-term forecast in Norway.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://whisper-weather-assistant.up.railway.app/">
+  <meta property="og:title" content="Weather Assistant">
+  <meta property="og:description" content="Perhaps, the most accurate short-term forecast in Norway.">
+  <meta property="og:image" content="https://whisper-weather-assistant.up.railway.app/icons/icon-512.png">
   <meta name="theme-color" content="#1b2a41">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Weather">
+  <meta name="apple-mobile-web-app-title" content="WeatherAssistant">
   <link rel="stylesheet" href="/style.css">
+  <script>try { if (localStorage.getItem('weather-assistant-theme') === 'photo') document.documentElement.classList.add('photo-loading'); } catch (err) {}</script>
 </head>
 
 <body>
@@ -23,8 +30,10 @@
           <button id="theme-toggle" class="icon-button" type="button" aria-expanded="false" aria-controls="theme-menu"
             aria-label="Choose a theme" title="Theme">🔘</button>
           <div id="theme-menu" class="theme-menu" hidden>
-            <button class="icon-button" type="button" data-theme-option="plain" aria-label="Plain" title="Plain">🔘</button>
-            <button class="icon-button" type="button" data-theme-option="glitter" aria-label="Glitter" title="Glitter">✨</button>
+            <button class="icon-button" type="button" data-theme-option="plain" aria-label="Plain"
+              title="Plain">🔘</button>
+            <button class="icon-button" type="button" data-theme-option="glitter" aria-label="Glitter"
+              title="Glitter">✨</button>
             <button class="icon-button" type="button" data-theme-option="photo" aria-label="Photo background"
               title="Photo background">📷</button>
           </div>

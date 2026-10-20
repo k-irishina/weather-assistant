@@ -66,5 +66,6 @@ def background_links() -> dict[str, str]:
             if element.tag.endswith("}Key")
         ]
         _listed.clear()
-        _listed[today] = {name: presigned_url(name, today) for name in names}
+        cache = {"response-cache-control": "max-age=86400"}
+        _listed[today] = {name: presigned_url(name, today, cache) for name in names}
     return _listed[today]

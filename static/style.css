@@ -132,7 +132,11 @@ body.photo-mode footer {
 }
 
 body.photo-mode footer {
-  padding-right: 1rem;
+  padding: .4rem 1rem;
+}
+
+body.photo-mode footer p {
+  margin: .25rem 0;
 }
 
 body.photo-mode .header-buttons {
@@ -149,6 +153,17 @@ main {
 
 body.photo-peek main {
   opacity: 0;
+}
+
+html.photo-loading main {
+  opacity: 0;
+  animation: show-anyway 0s 1.2s forwards;
+}
+
+@keyframes show-anyway {
+  to {
+    opacity: 1;
+  }
 }
 
 #theme-toggle {

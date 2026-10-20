@@ -282,15 +282,7 @@ async function loadForecast(day = 'today') {
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
-    if (day === 'today') {
-      const firstSymbol = Object.values(data.temperatures).find((period) => period.symbol_code)?.symbol_code;
-      photoToShow = {
-        month: MONTH_NAMES[Number(data.day.slice(5, 7)) - 1],
-        part: dayPart(minutesOf(data.generated_at.slice(11, 16)), minutesOf(data.sunrise), minutesOf(data.sunset)),
-        sky: skyOf(firstSymbol),
-      };
-      showPhoto();
-    }
+    if (day === 'today') showPhoto();
     if (isAdminDevice) loadWarnings();
     forecastLoadedAt = Date.now();
   } catch (err) {
@@ -301,90 +293,39 @@ async function loadForecast(day = 'today') {
   }
 }
 
-function skyOf(symbolCode) {
-  if (!symbolCode) return '';
-  if (symbolCode.includes('snow')) return 'snow';
-  if (/rain|sleet|thunder/.test(symbolCode)) return 'rain';
-  if (symbolCode.startsWith('clearsky') || symbolCode.startsWith('fair')) return 'clear';
-  if (symbolCode.startsWith('partlycloudy')) return 'partly';
-  return 'cloudy';
-}
+const PHOTO_REFRESH_MS = 10 * 60 * 1000;
+let photoAskedFor = '';
 
-const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june',
-  'july', 'august', 'september', 'october', 'november', 'december'];
-const DAY_PARTS = ['morning', 'day', 'sunset', 'evening', 'night'];
-const SKY_WORDS = {
-  clear: ['clear', 'sunny'],
-  partly: ['partly', 'clear', 'cloudy'],
-  cloudy: ['cloudy'],
-  rain: ['rainy'],
-  snow: ['snowy'],
-};
-const ALL_SKY_WORDS = Object.values(SKY_WORDS).flat();
-const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
-
-let photoLinks = null;
-let photoToShow = null;
-const pickedPhotos = {};
-
-function minutesOf(hhmm) {
-  const [hours, minutes] = hhmm.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-// "sunset" around sunset, "night" 90 min after it
-function dayPart(now, sunrise, sunset) {
-  if (now >= sunset - 45 && now < sunset + 30) return 'sunset';
-  if (now >= sunrise - 30 && now < 11 * 60) return 'morning';
-  if (now >= sunset + 90 || now < sunrise - 30) return 'night';
-  if (now < sunset) return 'day';
-  return 'evening';
-}
-
-function photoScore(name, { month, part, sky }) {
-  const dot = name.lastIndexOf('.');
-  if (!PHOTO_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase())) return -1;
-  const words = name.slice(0, dot).toLowerCase().split('-');
-  const nameMonth = words.find((word) => MONTH_NAMES.includes(word));
-  const namePart = words.find((word) => DAY_PARTS.includes(word));
-  const conditions = words.filter((word) => ALL_SKY_WORDS.includes(word));
-  const fittingWords = SKY_WORDS[sky] ?? [];
-
-  if (namePart && namePart !== part) return -1;
-  if (conditions.length && !conditions.some((word) => fittingWords.includes(word))) return -1;
-
-  // another month's photo only when nothing else fits
-  let score = 0;
-  if (nameMonth === month) score += 4;
-  if (!nameMonth) score += 2;
-  if (namePart) score += 1;
-  if (conditions.length || sky === 'cloudy' || part === 'night') score += 1;
-  return score;
-}
-
-// The best fitting photo, a random one of them when several fit as well
-function pickPhoto(names, wanted) {
-  const scores = names.map((name) => photoScore(name, wanted));
-  const best = Math.max(...scores);
-  if (best < 0) return null;
-  const bestNames = names.filter((name, index) => scores[index] === best);
-  return bestNames[Math.floor(Math.random() * bestNames.length)];
+function stopWaitingForPhoto() {
+  document.documentElement.classList.remove('photo-loading');
 }
 
 async function showPhoto() {
-  if (!document.body.classList.contains('photo-mode') || !photoToShow) return;
-  if (photoLinks === null) {
-    try {
-      const res = await fetch('/api/backgrounds');
-      photoLinks = (await res.json()).files;
-    } catch (err) {
-      return;
+  if (!document.body.classList.contains('photo-mode')) return stopWaitingForPhoto();
+  const areaId = selectedArea ?? rememberedArea();
+  const timeSlot = Math.floor(Date.now() / PHOTO_REFRESH_MS);
+  if (`${areaId}-${timeSlot}` === photoAskedFor) return;
+  photoAskedFor = `${areaId}-${timeSlot}`;
+  try {
+    const query = areaId === null ? '' : `?area=${areaId}`;
+    const res = await fetch(`/api/background${query}`);
+    const { area, link } = await res.json();
+    photoAskedFor = `${area}-${timeSlot}`;
+    if (!link) {
+      document.body.style.setProperty('--photo', 'none');
+      return stopWaitingForPhoto();
     }
+    // shown once downloaded
+    const image = new Image();
+    image.onload = image.onerror = () => {
+      document.body.style.setProperty('--photo', `url("${link}")`);
+      stopWaitingForPhoto();
+    };
+    image.src = link;
+  } catch (err) {
+    photoAskedFor = '';
+    stopWaitingForPhoto();
   }
-  const key = JSON.stringify(photoToShow);
-  pickedPhotos[key] ??= pickPhoto(Object.keys(photoLinks), photoToShow);
-  const name = pickedPhotos[key];
-  document.body.style.setProperty('--photo', name ? `url("${photoLinks[name]}")` : 'none');
 }
 
 function dayFlipButton(label, targetDay) {
