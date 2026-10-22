@@ -472,6 +472,30 @@ select {
   text-align: center;
 }
 
+.condition-details {
+  flex: 1;
+}
+
+.details-toggle {
+  margin-left: auto;
+  font-size: .8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.conditions .condition-details summary::after,
+.conditions .condition-details[open] summary::after {
+  margin-left: 0;
+}
+
+.condition-details ul {
+  margin: 4px 0 4px 2.2em;
+  padding: 0;
+  list-style: none;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
 .conditions li[data-kind="uv"] {
   color: var(--muted);
 }
@@ -648,7 +672,8 @@ body.glitter-mode .new-badge {
   flex: 1;
 }
 
-.temp-period summary {
+.temp-period summary,
+.condition-details summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -656,12 +681,13 @@ body.glitter-mode .new-badge {
   list-style: none;
 }
 
-.temp-period summary::-webkit-details-marker {
+.temp-period summary::-webkit-details-marker,
+.condition-details summary::-webkit-details-marker {
   display: none;
 }
-
-/* same chevron as the notification settings pushed to the right edge */
-.temp-period summary::after {
+/* down-pointing chevron for expandable sections */
+.temp-period summary::after,
+.condition-details summary::after {
   content: "";
   flex: none;
   width: .45rem;
@@ -673,7 +699,8 @@ body.glitter-mode .new-badge {
   transition: transform .2s ease;
 }
 
-.temp-period[open] summary::after {
+.temp-period[open] summary::after,
+.condition-details[open] summary::after {
   margin: .2rem .25rem 0 auto;
   transform: rotate(-135deg);
 }

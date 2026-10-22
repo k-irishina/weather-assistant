@@ -73,6 +73,9 @@ def fits_weather_conditions(photo: Photo, group: tuple) -> bool:
 def pick_photo(names: dict[str, str], symbol_code: str, local_now: datetime, sunrise: time, sunset: time) -> Optional[str]:
     basecondition = symbol_code.partition("_")[0]
     part = day_part(local_now.time(), sunrise, sunset)
+    # so rain photos win over the sunset ones
+    if part == "sunset" and "rain" in basecondition:
+        part = "evening"
     condition_groups = photo_conditions(basecondition)
     if part == "night":
         # night photos without conditions fit everything
@@ -80,14 +83,14 @@ def pick_photo(names: dict[str, str], symbol_code: str, local_now: datetime, sun
 
     photos = [photo for photo in map(photo_info, names) if photo]
     month = calendar.month_name[local_now.month].lower()
-    other_months = {photo.folder for photo in photos} - {month, "night"}
+    other_months = {photo.folder for photo in photos} - {month, "night", "common"}
     folders = ["night"] if part == "night" else [month, *other_months]
 
     for folder in folders:
         for group in condition_groups:
             doesfit = [
                 photo.name for photo in photos
-                if photo.folder == folder
+                if (photo.folder == folder or (photo.folder == "common" and folder != "night"))
                 and (photo.part == part or (photo.part is None and part != "sunset"))
                 # for now, sunset photos fit any weather
                 and (part == "sunset" or fits_weather_conditions(photo, group))

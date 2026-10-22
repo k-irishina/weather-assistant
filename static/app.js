@@ -223,7 +223,25 @@ function conditionList(items) {
     const text = document.createElement('span');
     text.textContent = item.text;
 
-    row.append(mark, text);
+    if (item.details.length) {
+      const details = document.createElement('details');
+      details.className = 'condition-details';
+      const summary = document.createElement('summary');
+      const toggle = document.createElement('span');
+      toggle.className = 'details-toggle';
+      toggle.textContent = 'Detailed';
+      summary.append(mark, text, toggle);
+      const lines = document.createElement('ul');
+      for (const line of item.details) {
+        const lineItem = document.createElement('li');
+        lineItem.textContent = line;
+        lines.append(lineItem);
+      }
+      details.append(summary, lines);
+      row.append(details);
+    } else {
+      row.append(mark, text);
+    }
     list.append(row);
   }
   return list;
