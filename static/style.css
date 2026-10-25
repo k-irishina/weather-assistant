@@ -369,6 +369,7 @@ select {
 
 .info-button {
   flex: none;
+  width: auto;
   padding: 0 .3rem;
   border: none;
   background: none;
