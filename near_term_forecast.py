@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 STEP_MINUTES = 5
 
-COVERED_REGIONS = frozenset({area.OSLO, area.AKERSHUS})
+COVERED_REGIONS = frozenset({area.OSLO, area.AKERSHUS, area.ROGALAND})
 
 class RainStep(NamedTuple):
     time: datetime  # UTC
@@ -151,40 +151,32 @@ def local_hhmm(moment: datetime, timezone: ZoneInfo) -> str:
 def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
     periods = rain_periods(series.steps, constants.rain_starting_rate)
     if not periods:
-        return ""
-
+        return "Dry for the next 2 hours"
     period = periods[0]
-    description = f"{level_of(peak_rate(period))} rain"
-
-    if period[0] is series.steps[0]:
-        opening = f"{description.capitalize()} now"
-    else:
-        opening = f"{description.capitalize()} from about {local_hhmm(period[0].time, timezone)}"
-
-    if period[-1] is series.steps[-1]:
-        closing = "continuing past the two-hour radar window"
-    else:
+    names = {"light": "Light rain", "moderate": "Rain", "heavy": "Heavy rain"}
+    name = names.get(level_of(peak_rate(period)), "Drizzle")
+    raining_now = period[0] is series.steps[0]
+    lasts_whole_window = period[-1] is series.steps[-1]
+    if raining_now and lasts_whole_window:
+        return f"{name} for the next 2 hours"
+    if raining_now and not lasts_whole_window:
         ends = period[-1].time + timedelta(minutes=STEP_MINUTES)
-        closing = f"easing around {local_hhmm(ends, timezone)}"
-
-    return f"{opening}, {closing}."
-
+        return f"{name} until about {local_hhmm(ends, timezone)}"
+    return f"{name} from about {local_hhmm(period[0].time, timezone)}"
 
 
 def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
-    """The rain strip, plus a one-line "now" read of the radar for the page header."""
+    # the rain strip
     if series is None or not series.steps or not is_covered(area_obj):
-        return {"available": False, "now": None}
+        return {"available": False}
 
     timezone = area_obj.region.timezone
-    now = compose_near_rain_text(series, timezone) or "Dry for the next 2 hours."
     # the graph shows anything the radar sees, drizzle included
     if not any(step.rate >= constants.drizzle_rate for step in series.steps):
-        return {"available": False, "now": now}
+        return {"available": False}
 
     return {
         "available": True,
-        "now": now,
         "area": area_obj.display_name,
         "updated_at": local_hhmm(series.created_at, timezone),
         "raining_now": series.steps[0].rate >= constants.rain_starting_rate,

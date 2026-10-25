@@ -5,8 +5,6 @@ const els = {
   forecast: document.getElementById('forecast'),
   warnings: document.getElementById('warnings'),
   rain: document.getElementById('rain'),
-  rightNow: document.getElementById('right-now'),
-  rightNowText: document.getElementById('right-now-text'),
   rainUpdated: document.getElementById('rain-updated'),
   rainInfoToggle: document.getElementById('rain-info-toggle'),
   rainInfo: document.getElementById('rain-info'),
@@ -84,21 +82,16 @@ async function setUpAreas() {
   els.areaSelect.onchange = () => changeArea(Number(els.areaSelect.value));
 }
 
-// Weather warnings for admins only for now
-let isAdminDevice = false;
 
 async function loadWarnings() {
   try {
-    const subscription = await registration.pushManager.getSubscription();
-    const res = await fetch('/api/warnings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: subscription.endpoint, area: selectedArea, day: forecastDay }),
-    });
+    const params = new URLSearchParams({ day: forecastDay });
+    if (selectedArea !== null) params.set('area', selectedArea);
+    const res = await fetch(`/api/warnings?${params}`);
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const { warnings } = await res.json();
     // only the titles, each opens to its time and text
-    els.warnings.replaceChildren(...warnings.map(({ name, icon, when, instruction }) => {
+    els.warnings.replaceChildren(...warnings.map(({ name, icon, when, instruction, color }) => {
       const warning = document.createElement('details');
       warning.className = 'warning';
       const summary = document.createElement('summary');
@@ -106,7 +99,8 @@ async function loadWarnings() {
       img.src = icon;
       img.alt = '';
       img.className = 'warning-icon';
-      const title = document.createElement('strong');
+      // bold only for orange and red
+      const title = document.createElement(color === 'yellow' ? 'span' : 'strong');
       title.textContent = name;
       summary.append(img, title);
       const time = document.createElement('p');
@@ -305,22 +299,31 @@ async function loadForecast(day = 'today') {
     headingRow.className = 'forecast-day-row';
     headingRow.append(heading);
 
-    if (day === 'today' && data.tomorrow_available) {
+    if (day === 'today') {
       headingRow.append(dayFlipButton('Tomorrow ›', 'tomorrow'));
     } else if (day === 'tomorrow') {
       headingRow.append(dayFlipButton('‹ Today', 'today'));
     }
 
+    const rightNow = document.createElement('p');
+    rightNow.className = 'right-now';
+    rightNow.hidden = !data.right_now;
+    const label = document.createElement('span');
+    label.className = 'right-now-label';
+    label.textContent = 'Now';
+    rightNow.append(label, data.right_now);
+
     els.forecast.classList.remove('page-flip');
     void els.forecast.offsetWidth;
     els.forecast.replaceChildren(
       headingRow,
+      rightNow,
       temperatureList(data.temperatures),
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
     if (day === 'today') showPhoto();
-    if (isAdminDevice) loadWarnings();
+    loadWarnings();
     forecastLoadedAt = Date.now();
   } catch (err) {
     els.place.textContent = '';
@@ -403,8 +406,6 @@ async function loadNearTermForecast() {
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
     nearTermLoadedAt = Date.now();
-    // "Now" line switched off until reworked
-    // renderRightNow(data.now);
     if (!data.available) {
       els.rain.hidden = true;
       return;
@@ -412,14 +413,8 @@ async function loadNearTermForecast() {
     renderRainStrip(data);
     els.rain.hidden = false;
   } catch (err) {
-    // renderRightNow(null);
     els.rain.hidden = true;
   }
-}
-
-function renderRightNow(text) {
-  els.rightNowText.textContent = text || '';
-  els.rightNow.hidden = !text;
 }
 
 const STALE_AFTER_MS = 15 * 60 * 1000;
@@ -701,8 +696,6 @@ async function showSubscriptionOptions() {
     updatePushSummary();
 
     if (!isAdmin) return;
-    isAdminDevice = true;
-    loadWarnings();
     els.testButton.hidden = false;
     els.testButton.disabled = false;
     els.testButton.textContent = 'Send a test notification';

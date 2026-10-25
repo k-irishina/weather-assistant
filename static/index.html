@@ -40,9 +40,6 @@
       </div>
       <h1>Weather Assistant</h1>
       <p class="place" id="place">Loading…</p>
-      <!-- "Now" line switched off until reworked
-      <p class="right-now" id="right-now" hidden><span class="right-now-label">Now</span> <span id="right-now-text"></span></p>
-      -->
     </header>
 
     <section id="in-app" class="card in-app" hidden>
@@ -87,14 +84,14 @@
     <section id="rain" class="card" hidden>
       <div class="card-heading">
         <h2>Two-hour rain</h2>
-        <button id="rain-info-toggle" class="info-button" type="button" aria-expanded="false"
-          aria-controls="rain-info" aria-label="What the colours mean" title="What the colours mean">ⓘ</button>
         <span class="muted updated-note" id="rain-updated"></span>
+        <button id="rain-info-toggle" class="info-button" type="button" aria-expanded="false" aria-controls="rain-info"
+          aria-label="Chart guide" title="Chart guide">ℹ️</button>
       </div>
       <div id="rain-info" class="rain-info" hidden>
         <ul class="rain-legend" id="rain-legend"></ul>
-        <p class="muted">Bar is 5 minutes. The <span class="light-only">darker</span><span
-            class="dark-only">brighter</span> the colour and the taller the bar, the heavier the rain. Fetched in real-time, more certain closer to now.</p>
+        <p class="muted">A bar is 5 minutes. The darker the colour and the taller the bar, the heavier the rain. Fetched in
+          real-time, more certain closer to now.</p>
       </div>
       <div class="rain-strip">
         <div class="rain-bars" id="rain-bars" role="img"
@@ -154,10 +151,9 @@
 
     <footer>
       <p class="muted">Made by <a href="https://sleepingonmars.neocities.org/">sleepingonmars</a>. Forecast data from
-        <a href="https://www.met.no/en">MET Norway</a> and 
-        <a href="https://www.varsom.no/en/flood-and-landslide-warning-service/">Varsom.no/NVE</a>
-        . On Telegram as
-        @WhisperWeatherBot.
+        <a href="https://www.met.no/en">MET Norway</a> and
+        <a href="https://www.varsom.no/en/flood-and-landslide-warning-service/">Varsom.no/NVE.</a>
+        On Telegram as @WhisperWeatherBot.
       </p>
       <p class="muted">Feedback? <a
           href="mailto:weather@around-app.no?subject=Weather%20Assistant%20feedback">weather@around-app.no</a>

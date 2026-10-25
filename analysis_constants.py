@@ -45,6 +45,8 @@ rain_starting_rate = 0.5
 moderate_rain_rate = 2.5
 heavy_rain_rate = 4.3
 very_heavy_rain_rate = 6.0
+heavy_rain_trusted_minutes = 90
+metalert_refresh_minutes = 300
 min_wet_steps = 2
 
 min_shown_uv_index = 2.5

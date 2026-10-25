@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 
 import app_config
+import analysis_constants as constants
 import area
 from met_alerts import Alert
 
@@ -29,7 +30,8 @@ def get_warnings(kind: str, municipality: str) -> Optional[list]:
 def warnings_for(area_obj: area.Area, day: date) -> list[Alert]:
     if not area_obj.municipality:
         return []
-    today = area_obj.region.today()
+    now = datetime.now(timezone.utc)
+    refresh = timedelta(minutes=constants.metalert_refresh_minutes)
     day_start = datetime.combine(day, time.min, tzinfo=area_obj.region.timezone)
     day_end = day_start + timedelta(days=1)
     not_before = max(day_start, datetime.now(timezone.utc))
@@ -37,11 +39,12 @@ def warnings_for(area_obj: area.Area, day: date) -> list[Alert]:
     alerts = []
     for kind in ("flood", "landslide"):
         key = (kind, area_obj.municipality)
-        if key not in _fetched or _fetched[key][0] != today:
+        if key not in _fetched or now - _fetched[key][0] > refresh:
             warnings = get_warnings(kind, area_obj.municipality)
-            if warnings is None:
-                continue
-            _fetched[key] = (today, warnings)
+            if warnings is not None:
+                _fetched[key] = (now, warnings)
+        if key not in _fetched:
+            continue
 
         for warning in _fetched[key][1]:
             color = {2: "yellow", 3: "orange", 4: "red"}.get(int(warning["ActivityLevel"]))

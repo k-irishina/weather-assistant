@@ -4,6 +4,7 @@ The page is the same assistant as the Telegram bot, for people who don't use
 Telegram.
 """
 import logging
+import re
 from pathlib import Path
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
@@ -168,7 +169,6 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     return {
         "area": report["area_name"],
         "day": report["forecast_day"].isoformat(),
-        "tomorrow_available": report["show_tomorrow"],
         "generated_at": report["local_now"].isoformat(),
         "updated_at": (
             None if report["forecast_checked_at"] is None
@@ -196,6 +196,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         },
         "wind": wind,
         "conditions": conditions,
+        "right_now": report["right_now"],
     }
 
 
@@ -333,13 +334,7 @@ def whoami(body: Unsubscribe) -> dict:
     }
 
 
-class WarningsRequest(BaseModel):
-    endpoint: str = Field(min_length=1)
-    area: Optional[int] = None
-    day: str = "today"
-
-
-def alert_duration_text(alert: met_alerts.Alert, local_now: datetime) -> str:
+def _alert_duration_text(alert: met_alerts.Alert, local_now: datetime) -> str:
     today = local_now.date()
     tomorrow = today + timedelta(days=1)
     starts = alert.starts.astimezone(local_now.tzinfo)
@@ -364,25 +359,33 @@ def alert_duration_text(alert: met_alerts.Alert, local_now: datetime) -> str:
     return text[0].upper() + text[1:]
 
 
-@router.post("/warnings")
-def get_warnings(body: WarningsRequest) -> dict:
-    # admin devices only while warnings are being tested
-    subscription = db.find_web_subscription(body.endpoint)
-    if subscription is None or not subscription.is_admin:
-        raise HTTPException(status_code=403, detail="Not a test device.")
-    if body.day not in ("today", "tomorrow"):
+def _readable_instruction(text: str) -> str:
+    skipped = ("municipalities", "stay informed", "keep yourself updated")
+    paragraphs = []
+    for paragraph in text.split("\n\n"):
+        sentences = re.split(r"(?<=[.!?])\s+", paragraph.strip())
+        kept = [sentence for sentence in sentences if not any(words in sentence.lower() for words in skipped)]
+        if kept:
+            paragraphs.append(" ".join(kept))
+    return "\n\n".join(paragraphs)
+
+
+@router.get("/warnings")
+def get_warnings(area: Optional[int] = None, day: str = "today") -> dict:
+    if day not in ("today", "tomorrow"):
         raise HTTPException(status_code=400, detail="day must be 'today' or 'tomorrow'.")
-    chosen = resolve_area(body.area)
+    chosen = resolve_area(area)
     local_now = chosen.region.now()
-    day = local_now.date() + timedelta(days=1 if body.day == "tomorrow" else 0)
-    alerts = met_alerts.alerts_for(chosen, day) + nve_warnings.warnings_for(chosen, day)
+    shown_day = local_now.date() + timedelta(days=1 if day == "tomorrow" else 0)
+    alerts = met_alerts.alerts_for(chosen, shown_day) + nve_warnings.warnings_for(chosen, shown_day)
     alerts.sort(key=lambda alert: ("Extreme", "Severe", "Moderate").index(alert.severity))
     return {"warnings": [
         {
             "name": alert.name,
             "icon": _alert_icon(alert),
-            "when": alert_duration_text(alert, local_now),
-            "instruction": alert.instruction,
+            "when": _alert_duration_text(alert, local_now),
+            "instruction": _readable_instruction(alert.instruction),
+            "color": alert.color,
         }
         for alert in alerts
     ]}

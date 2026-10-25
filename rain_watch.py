@@ -53,12 +53,15 @@ def decide(
     covered = baseline is not None and any(hour in baseline for hour in hours)
     forecast_called = covered and bool(hours & forecast_rain_hours(baseline))
 
+    trusted_until = series.created_at + timedelta(minutes=constants.heavy_rain_trusted_minutes)
+    trusted_steps = [step for step in run if step.time <= trusted_until]
     heavy_periods = [
-        period for period in near_term_forecast.rain_periods(run, constants.heavy_rain_rate)
+        period for period in near_term_forecast.rain_periods(trusted_steps, constants.heavy_rain_rate)
         if len(period) >= constants.min_wet_steps
     ]
-    if heavy_periods and (not forecast_called or alert.peak_rate >= constants.very_heavy_rain_rate):
-        return alert._replace(heavy_from=heavy_periods[0][0].time)
+    trusted_peak = max((step.rate for step in trusted_steps), default=0.0)
+    if heavy_periods and (not forecast_called or trusted_peak >= constants.very_heavy_rain_rate):
+        return alert._replace(heavy_from=heavy_periods[0][0].time, peak_rate=trusted_peak)
 
     if not covered or forecast_called:
         return None

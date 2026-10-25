@@ -35,7 +35,6 @@ class ForecastReport(TypedDict):
     local_now: datetime
     # none when the report is for the next day
     from_hour: Optional[time]
-    show_tomorrow: bool
     temperatures: dict
     hourly_temperatures: dict[time, float]
     forecast_checked_at: Optional[datetime]
@@ -50,6 +49,7 @@ class ForecastReport(TypedDict):
     precipitation_chances: dict[time, float]
     precipitation_amounts: dict[time, float]
     wind_by_hour: dict[time, db_connector.WindReading]
+    right_now: str
 
 
 ICON_SUFFIXES = ("_day", "_night", "_polartwilight")
@@ -97,7 +97,6 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
 
     local_now = area_obj.region.now()
     forecast_day = local_now.date() if day == "today" else local_now.date() + timedelta(days=1)
-    tomorrow_available = local_now.time() >= time(17)
 
     # analysed values
     avg_temperatures = db_connector.select_related_temperatures(area_obj, forecast_day)
@@ -139,6 +138,9 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     hourly_temperatures = from_hour_onwards(hourly_temperatures, from_hour)
 
     outlook = classify_precipitation(precipitation_pct_by_hour, window_pct_by_hour)
+    right_now = ""
+    if day == "today":
+        right_now = right_now_text(area_obj, from_hour, hourly_temperatures, wind_by_hour)
 
     return ForecastReport(
         area_id=area_obj.id,
@@ -146,7 +148,6 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         forecast_day=forecast_day,
         local_now=local_now,
         from_hour=from_hour,
-        show_tomorrow=tomorrow_available,
         temperatures=avg_temperatures,
         hourly_temperatures=hourly_temperatures,
         uv_index=uv_index,
@@ -161,7 +162,33 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         precipitation_chances=precipitation_pct_by_hour,
         precipitation_amounts=precipitation_amounts,
         wind_by_hour=wind_by_hour,
+        right_now=right_now,
     )
+
+
+def right_now_text(area_obj: area.Area, hour: time, hourly_temperatures: dict, wind_by_hour: dict) -> str:
+    parts = []
+    temperature = hourly_temperatures.get(hour)
+    if temperature is not None:
+        temperature = float(temperature)
+        text = f"{round_temperature(temperature)}°"
+        reading = wind_by_hour.get(hour)
+        wind_kmh = float(reading.speed) * 3.6 if reading and reading.speed is not None else 0.0
+        # wind chill formula: to be adjusted
+        if temperature <= 10 and wind_kmh >= 4.8:
+            wind_factor = wind_kmh ** 0.16
+            feels_like = 13.12 + 0.6215 * temperature - 11.37 * wind_factor + 0.3965 * temperature * wind_factor
+            if round_temperature(feels_like) != round_temperature(temperature):
+                text += f", feels like {round_temperature(feels_like)}°"
+        parts.append(text)
+
+    if near_term_forecast.is_covered(area_obj):
+        now = datetime.now(timezone.utc)
+        series = near_term_forecast.latest_series(area_obj)
+        if series is not None and near_term_forecast.is_fresh(series, now):
+            series = near_term_forecast.without_past_steps(series, now)
+            parts.append(near_term_forecast.compose_near_rain_text(series, area_obj.region.timezone))
+    return " · ".join(parts)
 
 
 def with_radar_amounts(area_obj: area.Area, forecast_day: date, amounts: dict[time, float]) -> dict[time, float]:
@@ -263,13 +290,13 @@ Forecast for {day_text}, {report["area_name"]}:
 
 
 def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list["WeatherCondition"]:
-    items = sunny_conditions(report["sunny_times"])
+    items = sunny_conditions(report["sunny_times"], report["from_hour"])
     items += precipitation_conditions(
         report["precipitation_high"], report["precipitation_possible"],
         report["precipitation_window"], report["precipitation_window_hours"],
         report["precipitation"], report["precipitation_amounts"], report["from_hour"],
     )
-    items += wind_conditions(report["wind_by_hour"], min_moderate_wind_hours)
+    items += wind_conditions(report["wind_by_hour"], min_moderate_wind_hours, report["from_hour"])
     uv_index = report["uv_index"]
     if uv_index is not None and float(uv_index) >= constants.min_shown_uv_index:
         items.append(WeatherCondition(
@@ -385,7 +412,9 @@ def from_hour_onwards(by_hour: dict, cutoff: Optional[time]) -> dict:
     return {hour: value for hour, value in by_hour.items() if hour >= cutoff}
 
 
-def wind_conditions(wind_by_hour: dict, min_moderate_run_hours: int = 1) -> list["WeatherCondition"]:
+def wind_conditions(
+    wind_by_hour: dict, min_moderate_run_hours: int = 1, current_hour: Optional[time] = None
+) -> list["WeatherCondition"]:
     strong, moderate = [], []
     for hour, reading in sorted(wind_by_hour.items()):
         strength = constants.wind_strength(
@@ -402,13 +431,13 @@ def wind_conditions(wind_by_hour: dict, min_moderate_run_hours: int = 1) -> list
     if strong:
         strong = bridge_gaps(strong, constants.max_bridge_gap_hours, blocked=moderate_set)
         items.append(WeatherCondition(kind="wind", emoji="\U0001f32c\ufe0f",
-                               text=f"Strong wind {format_hours(strong)}."))
+                               text=f"Strong wind {format_hours(strong, current_hour)}."))
 
     moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
     moderate = significant_moderate_wind_hours(moderate, min_moderate_run_hours)
     if moderate:
         items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
-                               text=f"Moderate wind {format_hours(moderate)}."))
+                               text=f"Moderate wind {format_hours(moderate, current_hour)}."))
     return items
 
 
@@ -453,14 +482,19 @@ def bridge_gaps(hours, max_gap_hours: int, blocked=frozenset()) -> list:
     return merged
 
 
-def format_hours(hours) -> str:
+def format_hours(hours, current_hour: Optional[time] = None) -> str:
     texts = []
     for interval in split_into_intervals(hours):
         start = format_hour(interval[0])
         end = format_hour(interval[-1])
         start_number, start_am_pm = start.split(" ")
         end_am_pm = end.split(" ")[1]
-        if len(interval) == 1:
+        starts_now = interval[0] == current_hour
+        if starts_now and len(interval) == 1:
+            texts.append("now")
+        elif starts_now and len(interval) > 1:
+            texts.append(f"until {end}")
+        elif len(interval) == 1:
             texts.append(start)
         elif start_am_pm == end_am_pm:
             texts.append(f"{start_number}–{end}")
@@ -502,11 +536,11 @@ def precipitation_conditions(
     icon_name = "snow" if name == "snow" else "rain"
     details = []
     if heavy_hours:
-        details.append({"symbol": f"heavy{icon_name}", "label": f"Heavy {name}", "hours": format_hours(heavy_hours)})
+        details.append({"symbol": f"heavy{icon_name}", "label": f"Heavy {name}", "hours": format_hours(heavy_hours, from_hour)})
     if moderate_hours:
-        details.append({"symbol": icon_name, "label": name.capitalize(), "hours": format_hours(moderate_hours)})
+        details.append({"symbol": icon_name, "label": name.capitalize(), "hours": format_hours(moderate_hours, from_hour)})
     if light_hours:
-        details.append({"symbol": f"light{icon_name}", "label": f"Light {name}", "hours": format_hours(light_hours)})
+        details.append({"symbol": f"light{icon_name}", "label": f"Light {name}", "hours": format_hours(light_hours, from_hour)})
     dry = hours_without_rain(rainy_hours, from_hour)
     mostly_rainy = len(rainy_hours) >= len(dry) and len(rainy_hours) >= constants.min_mostly_rainy_hours
     if mostly_rainy:
@@ -531,12 +565,12 @@ def precipitation_conditions(
         high = bridge_gaps(merged_likely, constants.max_bridge_gap_hours, blocked=possible_set)
         items.append(WeatherCondition(
             kind="rain", emoji=active,
-            text=f"High chance of {name} {format_hours(high)}"))
+            text=f"High chance of {name} {format_hours(high, from_hour)}"))
     if merged_possible:
         possible = bridge_gaps(merged_possible, constants.max_bridge_gap_hours, blocked=high_set)
         items.append(WeatherCondition(
             kind="rain", emoji=active,
-            text=f"Might {name} {format_hours(possible)}."))
+            text=f"Might {name} {format_hours(possible, from_hour)}."))
     if items:
         items[0].details = details
         return items
@@ -545,7 +579,7 @@ def precipitation_conditions(
         return [WeatherCondition(kind="rain", emoji=inactive, text=f"No {name} in sight!")]
 
     window_hours = bridge_gaps(window_hours, constants.max_bridge_gap_hours)
-    span = f" {format_hours(window_hours)}" if window_hours else ""
+    span = f" {format_hours(window_hours, from_hour)}" if window_hours else ""
     return [WeatherCondition(
         kind="rain", emoji=active,
         text=f"Potential for {name}{span} ({round(window_probability)}% chance)")]
@@ -622,6 +656,7 @@ def detect_sun_change_for_area(select_area: area.Area):
         log.debug('No changes to analyse yet, offset:' + str(hours_since_cutoff))
         return None
 
+    rcf.fetch_forecast_for_area_id(select_area.id)
     previous_forecast = db_connector.select_previous_forecast_for_x_hrs(
         select_area, 12, hours_since_cutoff
     )
@@ -679,13 +714,13 @@ def compare_two_forecasts(g_previous_forecast: dict, g_current_forecast: dict) -
     return now_sunny_at
 
 
-def sunny_conditions(sunny_times: dict[time, float]) -> list["WeatherCondition"]:
+def sunny_conditions(sunny_times: dict[time, float], current_hour: Optional[time] = None) -> list["WeatherCondition"]:
     if not sunny_times:
         return [WeatherCondition(kind="sun", emoji="😔", text="No sunny times")]
     hours = bridge_gaps(sorted(sunny_times), constants.max_bridge_gap_hours)
     return [WeatherCondition(
         kind="sun", emoji="🌞",
-        text=f"Expect sun {format_hours(hours)}",
+        text=f"Expect sun {format_hours(hours, current_hour)}",
     )]
 
 

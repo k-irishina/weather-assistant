@@ -1,5 +1,9 @@
 [
-    {
+  {
+    "date": "2026-10-25",
+    "text": "Meteo alerts are live! Summary of current conditions. Tomorrow's forecast is available all day. Enabled rain graph and rain alerts for Stavanger."
+  },
+  {
     "date": "2026-10-25",
     "text": "All about rain: better info on page, better morning push data, better heavy rain alerts!"
   },

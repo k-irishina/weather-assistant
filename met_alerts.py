@@ -1,6 +1,7 @@
 from datetime import date, datetime, time, timedelta, timezone
 from typing import NamedTuple
 
+import analysis_constants as constants
 import area
 import yr_requests
 from json_processor import parse_utc
@@ -19,7 +20,6 @@ class Alert(NamedTuple):
     instruction: str
 
 
-# county -> (local day, warnings): one request per county per day, made on first use
 _fetched: dict[int, tuple] = {}
 
 
@@ -27,12 +27,14 @@ def alerts_for(area_obj: area.Area, day: date) -> list[Alert]:
     county = area_obj.region.ssb_county
     if not county:
         return []
-    today = area_obj.region.today()
-    if county not in _fetched or _fetched[county][0] != today:
+    now = datetime.now(timezone.utc)
+    refresh = timedelta(minutes=constants.metalert_refresh_minutes)
+    if county not in _fetched or now - _fetched[county][0] > refresh:
         features = yr_requests.get_metalerts(county)
-        if features is None:  # MET unreachable: try again next time
+        if features is None and county not in _fetched:  # MET unreachable: try again next time
             return []
-        _fetched[county] = (today, features)
+        if features is not None:
+            _fetched[county] = (now, features)
 
     day_start = datetime.combine(day, time.min, tzinfo=area_obj.region.timezone)
     day_end = day_start + timedelta(days=1)
