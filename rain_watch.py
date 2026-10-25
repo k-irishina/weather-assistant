@@ -29,6 +29,7 @@ class RainAlert(NamedTuple):
     starts_at: datetime  # UTC
     peak_rate: float  # mm/h
     minutes: int
+    heavy_from: Optional[datetime] = None
 
 
 def decide(
@@ -52,10 +53,12 @@ def decide(
     covered = baseline is not None and any(hour in baseline for hour in hours)
     forecast_called = covered and bool(hours & forecast_rain_hours(baseline))
 
-    heavy_periods = near_term_forecast.rain_periods(run, constants.heavy_rain_rate)
-    heavy = any(len(period) >= constants.min_wet_steps for period in heavy_periods)
-    if heavy and (not forecast_called or alert.peak_rate >= constants.very_heavy_rain_rate):
-        return alert
+    heavy_periods = [
+        period for period in near_term_forecast.rain_periods(run, constants.heavy_rain_rate)
+        if len(period) >= constants.min_wet_steps
+    ]
+    if heavy_periods and (not forecast_called or alert.peak_rate >= constants.very_heavy_rain_rate):
+        return alert._replace(heavy_from=heavy_periods[0][0].time)
 
     if not covered or forecast_called:
         return None
@@ -142,8 +145,13 @@ def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
     when = near_term_forecast.local_hhmm(alert.starts_at, timezone)
     if alert.kind == HEAVY:
         title = "Heavy rain incoming"
-        body = (f"{alert.peak_rate:g} mm/h from about {when} in "
-                f"{area_obj.display_name}, for around {duration_text(alert.minutes)}.")
+        heavy_when = near_term_forecast.local_hhmm(alert.heavy_from, timezone)
+        if heavy_when == when:
+            body = (f"{alert.peak_rate:g} mm/h from about {when} in "
+                    f"{area_obj.display_name}, for around {duration_text(alert.minutes)}.")
+        else:
+            body = (f"Rain from about {when} in {area_obj.display_name}, heavy from about "
+                    f"{heavy_when} (up to {alert.peak_rate:g} mm/h), for around {duration_text(alert.minutes)}.")
     else:
         title = "Rain the forecast missed"
         body = (f"Rain from about {when} in "

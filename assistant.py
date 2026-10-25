@@ -47,6 +47,8 @@ class ForecastReport(TypedDict):
     precipitation_possible: list[time]
     precipitation_window: Optional[float]
     precipitation_window_hours: list[time]
+    precipitation_chances: dict[time, float]
+    precipitation_amounts: dict[time, float]
     wind_by_hour: dict[time, db_connector.WindReading]
 
 
@@ -111,13 +113,17 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         sunrise_sunset["sunrise_time"],
         sunrise_sunset["sunset_time"],
     )
-    precipitation_pct_by_hour = db_connector.precipitation_probabilities(
-        area_obj, forecast_day, "next_1_hours"
+    precipitation_pct_by_hour = db_connector.hourly_precipitation(
+        area_obj, forecast_day, "next_1_hours", "probability_of_precipitation"
+    )
+    precipitation_amounts = db_connector.hourly_precipitation(
+        area_obj, forecast_day, "next_1_hours", "precipitation_amount"
     )
     if day == "today":
         precipitation_pct_by_hour = with_radar(area_obj, forecast_day, precipitation_pct_by_hour)
-    window_pct_by_hour = db_connector.precipitation_probabilities(
-        area_obj, forecast_day, "next_6_hours"
+        precipitation_amounts = with_radar_amounts(area_obj, forecast_day, precipitation_amounts)
+    window_pct_by_hour = db_connector.hourly_precipitation(
+        area_obj, forecast_day, "next_6_hours", "probability_of_precipitation"
     )
     uv_index = db_connector.highest_uv_index(area_obj, forecast_day)
     forecast_checked_at = db_connector.latest_forecast_check_at(area_obj)
@@ -127,6 +133,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     from_hour = current_hour_cutoff(local_now, forecast_day)
     sunny_times = from_hour_onwards(sunny_times, from_hour)
     precipitation_pct_by_hour = from_hour_onwards(precipitation_pct_by_hour, from_hour)
+    precipitation_amounts = from_hour_onwards(precipitation_amounts, from_hour)
     window_pct_by_hour = from_hour_onwards(window_pct_by_hour, from_hour)
     wind_by_hour = from_hour_onwards(wind_by_hour, from_hour)
     hourly_temperatures = from_hour_onwards(hourly_temperatures, from_hour)
@@ -151,8 +158,26 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         precipitation_possible=outlook.possible,
         precipitation_window=outlook.window_probability,
         precipitation_window_hours=outlook.window_hours,
+        precipitation_chances=precipitation_pct_by_hour,
+        precipitation_amounts=precipitation_amounts,
         wind_by_hour=wind_by_hour,
     )
+
+
+def with_radar_amounts(area_obj: area.Area, forecast_day: date, amounts: dict[time, float]) -> dict[time, float]:
+    if not near_term_forecast.is_covered(area_obj):
+        return amounts
+    series = near_term_forecast.latest_series(area_obj)
+    if series is None or not near_term_forecast.is_fresh(series, datetime.now(timezone.utc)):
+        return amounts
+
+    tz = area_obj.region.timezone
+    radar_amounts = {
+        moment.astimezone(tz).time(): rate
+        for moment, rate in near_term_forecast.average_rain_per_hour(series).items()
+        if moment.astimezone(tz).date() == forecast_day
+    }
+    return {**amounts, **radar_amounts}
 
 
 def with_radar(area_obj: area.Area, forecast_day: date, hourly: dict[time, float]) -> dict[time, float]:
@@ -242,7 +267,7 @@ def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list
     items += precipitation_conditions(
         report["precipitation_high"], report["precipitation_possible"],
         report["precipitation_window"], report["precipitation_window_hours"],
-        report["precipitation"], report["from_hour"],
+        report["precipitation"], report["precipitation_amounts"], report["from_hour"],
     )
     items += wind_conditions(report["wind_by_hour"], min_moderate_wind_hours)
     uv_index = report["uv_index"]
@@ -305,7 +330,22 @@ def compact_precipitation_text(report: ForecastReport) -> str:
     hours = sorted(set(report["precipitation_high"]) | set(report["precipitation_possible"]))
     if hours:
         hours = bridge_gaps(hours, constants.max_bridge_gap_hours)
-        return f'{precipitation["emoji_active"]} {precipitation["name"]} {format_hours(hours)}'
+        # removing faint hours from push to not mislead users
+        faint_hours = {
+            hour for hour in hours
+            if report["precipitation_amounts"].get(hour, 0.0) < constants.push_light_rain_mm
+            or report["precipitation_chances"].get(hour, 0.0) < constants.confident_hour_probability
+        }
+        kept_hours = []
+        for interval in split_into_intervals(hours):
+            while interval and interval[0] in faint_hours:
+                interval = interval[1:]
+            while interval and interval[-1] in faint_hours:
+                interval = interval[:-1]
+            kept_hours += interval
+        if kept_hours:
+            return f'{precipitation["emoji_active"]} {precipitation["name"]} {format_hours(kept_hours)}'
+        return f'{precipitation["emoji_active"]} light {precipitation["name"]} {format_hours(hours)}'
     if report["precipitation_window_hours"]:
         window_hours = bridge_gaps(report["precipitation_window_hours"], constants.max_bridge_gap_hours)
         return (f'{precipitation["emoji_active"]} might {precipitation["name"]} '
@@ -441,24 +481,37 @@ def format_temperature(value) -> str:
     return "no data" if value is None else f"{value} °C"
 
 def precipitation_conditions(
-    highprcpt, potentialprcpt, window_probability, window_hours, precipitation, from_hour=None
+    highprcpt, potentialprcpt, window_probability, window_hours, precipitation, amounts, from_hour=None
 ) -> list["WeatherCondition"]:
     name = precipitation["name"]
     active, inactive = precipitation["emoji_active"], precipitation["emoji_inactive"]
 
-    details = []
-    if highprcpt:
-        likely = bridge_gaps(sorted(highprcpt), constants.max_bridge_gap_hours, blocked=frozenset(potentialprcpt))
-        details.append(f"High chance of {name} {format_hours(likely)}")
-    if potentialprcpt:
-        possible = bridge_gaps(sorted(potentialprcpt), constants.max_bridge_gap_hours, blocked=frozenset(highprcpt))
-        details.append(f"Might {name} {format_hours(possible)}.")
-
     rainy_hours = set(highprcpt) | set(potentialprcpt)
-    if len(rainy_hours) >= constants.mostly_rainy_hours:
-        dry = hours_without_rain(rainy_hours, from_hour)
+
+    heavy_hours, moderate_hours, light_hours = [], [], []
+    for hour in sorted(rainy_hours):
+        amount = amounts.get(hour, 0.0)
+        if amount >= constants.heavy_rain_rate:
+            heavy_hours.append(hour)
+        if constants.moderate_rain_rate <= amount < constants.heavy_rain_rate:
+            moderate_hours.append(hour)
+        # MET expects no rain at all in a 0 mm hour, nothing to list
+        if 0 < amount < constants.moderate_rain_rate:
+            light_hours.append(hour)
+    details = []
+    if heavy_hours:
+        details.append(f"Heavy {name} {format_hours(heavy_hours)}")
+    if moderate_hours:
+        details.append(f"{name.capitalize()} {format_hours(moderate_hours)}")
+    if light_hours:
+        details.append(f"Light {name} {format_hours(light_hours)}")
+    dry = hours_without_rain(rainy_hours, from_hour)
+    mostly_rainy = len(rainy_hours) >= len(dry) and len(rainy_hours) >= constants.min_mostly_rainy_hours
+    if mostly_rainy:
         if len(dry) >= 2:
-            text = f"{name.capitalize()} most of the day, dry {format_hours(dry)}"
+            text = f"{name.capitalize()} most of the day"
+        elif from_hour:
+            text = f"{name.capitalize()} for the rest of the day"
         else:
             text = f"{name.capitalize()} all day"
         return [WeatherCondition(kind="rain", emoji=active, text=text, details=details)]
@@ -482,10 +535,8 @@ def precipitation_conditions(
         items.append(WeatherCondition(
             kind="rain", emoji=active,
             text=f"Might {name} {format_hours(possible)}."))
-    # only if merging the hours changes the text
-    if items and [item.text for item in items] != details:
-        items[0].details = details
     if items:
+        items[0].details = details
         return items
 
     if window_probability is None:
@@ -504,7 +555,7 @@ def compose_precipitation_text(
     return "\n".join(
         f'{item.emoji} {item.text}'
         for item in precipitation_conditions(
-            highprcpt, potentialprcpt, window_probability, window_hours, precipitation
+            highprcpt, potentialprcpt, window_probability, window_hours, precipitation, {}
         )
     )
 

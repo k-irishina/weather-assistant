@@ -215,17 +215,17 @@ def evaluate_clouds(
     return unique_cloud_coverage
 
 
-def precipitation_probabilities(
-    area: area.Area, date: date, window: str
+def hourly_precipitation(
+    area: area.Area, date: date, window: str, field: str
 ) -> dict[time, float]:
-    """Latest stored probability per hour, read from a next_1_hours/next_6_hours block."""
+    # latest stored value per hour from a next_1_hours/next_6_hours block
     timezone = str(area.region.timezone)
     day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
         with conn.cursor() as cursor:
             query = """
                     WITH latest_data AS (
-                    SELECT forecast_time, forecast_data->%(window)s->>'probability_of_precipitation' AS precip
+                    SELECT forecast_time, forecast_data->%(window)s->>%(field)s AS precip
                         FROM forecast_complete
                         WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
                           AND area = %(area)s
@@ -250,13 +250,12 @@ def precipitation_probabilities(
                     "day_end": day_end,
                     "area": area.id,
                     "window": window,
+                    "field": field,
                 },
             )
             results = cursor.fetchall()
 
-    return {row[0]: row[1] for row in results}
-
-
+    return {row[0]: float(row[1]) for row in results}
 
 
 def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:

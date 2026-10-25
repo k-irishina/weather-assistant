@@ -31,8 +31,10 @@ min_significant_moderate_wind_run_hours = 4
 moderate_wind_mentioned_from = time(5)
 
 max_bridge_gap_hours = 1
-# how many rain hrs count as "rain all day"
-mostly_rainy_hours = 12
+# baseline hours to say "rain all day"
+min_mostly_rainy_hours = 6
+# rain people don't care that much about
+push_light_rain_mm = 1.0
 
 moderate_gust_speed = 6.5
 strong_gust_speed = 9.0

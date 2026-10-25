@@ -211,6 +211,13 @@ def _hour_start(moment: datetime) -> datetime:
     return moment.replace(minute=0, second=0, microsecond=0)
 
 
+def average_rain_per_hour(series: NearTermSeries) -> dict[datetime, float]:
+    rates = {}
+    for step in series.steps:
+        rates.setdefault(_hour_start(step.time), []).append(step.rate)
+    return {hour: sum(hour_rates) / len(hour_rates) for hour, hour_rates in rates.items()}
+
+
 def without_past_steps(series: NearTermSeries, now: datetime) -> NearTermSeries:
     step_length = timedelta(minutes=STEP_MINUTES)
     still_ahead = [step for step in series.steps if step.time + step_length > now]
