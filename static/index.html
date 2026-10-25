@@ -87,13 +87,19 @@
     <section id="rain" class="card" hidden>
       <div class="card-heading">
         <h2>Two-hour rain</h2>
+        <button id="rain-info-toggle" class="info-button" type="button" aria-expanded="false"
+          aria-controls="rain-info" aria-label="What the colours mean" title="What the colours mean">ⓘ</button>
         <span class="muted updated-note" id="rain-updated"></span>
+      </div>
+      <div id="rain-info" class="rain-info" hidden>
+        <ul class="rain-legend" id="rain-legend"></ul>
+        <p class="muted">Bar is 5 minutes. The <span class="light-only">darker</span><span
+            class="dark-only">brighter</span> the colour and the taller the bar, the heavier the rain. Fetched in real-time, more certain closer to now.</p>
       </div>
       <div class="rain-strip">
         <div class="rain-bars" id="rain-bars" role="img"
           aria-label="Rain rate for the next two hours, one bar per 5 minutes"></div>
         <div class="rain-ticks" id="rain-ticks"></div>
-        <p class="rain-scale muted" id="rain-scale" hidden>A bar = 5 minutes</p>
       </div>
     </section>
 

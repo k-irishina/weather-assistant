@@ -191,6 +191,12 @@ def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
         "peak_rate": peak_rate(series.steps),
         "scale_floor": constants.heavy_rain_rate,
         "total_mm": total_precipitation(series.steps),
+        "legend": [
+            {"level": "drizzle", "text": f"Drizzle, from {constants.drizzle_rate:g} mm/h"},
+            {"level": "light", "text": f"Light rain, from {constants.rain_starting_rate:g} mm/h"},
+            {"level": "moderate", "text": f"Rain, from {constants.moderate_rain_rate:g} mm/h"},
+            {"level": "heavy", "text": f"Heavy rain, from {constants.heavy_rain_rate:g} mm/h"},
+        ],
         "steps": [
             {
                 "time": local_hhmm(step.time, timezone),

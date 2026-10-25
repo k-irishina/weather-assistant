@@ -8,9 +8,11 @@ const els = {
   rightNow: document.getElementById('right-now'),
   rightNowText: document.getElementById('right-now-text'),
   rainUpdated: document.getElementById('rain-updated'),
+  rainInfoToggle: document.getElementById('rain-info-toggle'),
+  rainInfo: document.getElementById('rain-info'),
+  rainLegend: document.getElementById('rain-legend'),
   rainBars: document.getElementById('rain-bars'),
   rainTicks: document.getElementById('rain-ticks'),
-  rainScale: document.getElementById('rain-scale'),
   status: document.getElementById('push-status'),
   button: document.getElementById('push-button'),
   pushSettings: document.getElementById('push-settings'),
@@ -95,23 +97,28 @@ async function loadWarnings() {
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const { warnings } = await res.json();
-    els.warnings.replaceChildren(...warnings.flatMap(({ name, icon, when, instruction }) => {
-      const title = document.createElement('p');
+    // only the titles, each opens to its time and text
+    els.warnings.replaceChildren(...warnings.map(({ name, icon, when, instruction }) => {
+      const warning = document.createElement('details');
+      warning.className = 'warning';
+      const summary = document.createElement('summary');
       const img = document.createElement('img');
       img.src = icon;
       img.alt = '';
       img.className = 'warning-icon';
-      const strong = document.createElement('strong');
-      strong.textContent = name;
-      title.append(img);
-      const time = document.createElement('span');
-      time.className = 'muted updated-note';
+      const title = document.createElement('strong');
+      title.textContent = name;
+      summary.append(img, title);
+      const time = document.createElement('p');
+      time.className = 'muted';
       time.textContent = when;
-      title.append(strong, time);
-      const advice = document.createElement('p');
-      advice.className = 'muted';
-      advice.textContent = instruction;
-      return [title, advice];
+      const paragraphs = instruction.split('\n\n').map((text) => {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = text;
+        return paragraph;
+      });
+      warning.append(summary, time, ...paragraphs);
+      return warning;
     }));
     els.warnings.hidden = warnings.length === 0;
   } catch (err) {
@@ -441,17 +448,20 @@ function scheduleNearTermForecastPoll() {
 }
 
 // tapping the graph explains the bars for a moment, instead of a permanent caption
-const RAIN_SCALE_SHOWN_MS = 4000;
-let rainScaleTimer = null;
-
-els.rainBars.addEventListener('click', () => {
-  clearTimeout(rainScaleTimer);
-  els.rainScale.hidden = false;
-  rainScaleTimer = setTimeout(() => { els.rainScale.hidden = true; }, RAIN_SCALE_SHOWN_MS);
-});
+els.rainInfoToggle.onclick = () => {
+  els.rainInfo.hidden = !els.rainInfo.hidden;
+  els.rainInfoToggle.setAttribute('aria-expanded', String(!els.rainInfo.hidden));
+};
 
 function renderRainStrip(data) {
   els.rainUpdated.textContent = `Updated ${data.updated_at}`;
+  els.rainLegend.replaceChildren(...data.legend.map(({ level, text }) => {
+    const item = document.createElement('li');
+    const swatch = document.createElement('span');
+    swatch.className = `rain-swatch rain-${level}`;
+    item.append(swatch, text);
+    return item;
+  }));
   const scale = Math.max(data.peak_rate, data.scale_floor);
 
   els.rainBars.replaceChildren(

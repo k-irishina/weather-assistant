@@ -339,6 +339,31 @@ class WarningsRequest(BaseModel):
     day: str = "today"
 
 
+def alert_duration_text(alert: met_alerts.Alert, local_now: datetime) -> str:
+    today = local_now.date()
+    tomorrow = today + timedelta(days=1)
+    starts = alert.starts.astimezone(local_now.tzinfo)
+    ends = alert.ends.astimezone(local_now.tzinfo)
+
+    if ends.date() == today:
+        until = f"until {ends:%H:%M}"
+    elif ends.date() == tomorrow:
+        until = "until tomorrow"
+    else:
+        until = f"until {ends:%A}"
+
+    if starts <= local_now:
+        start = ""
+    elif starts.date() == today:
+        start = f"from {starts:%H:%M} "
+    elif starts.date() == tomorrow:
+        start = f"from tomorrow {starts:%H:%M} "
+    else:
+        start = f"from {starts:%A %H:%M} "
+    text = start + until
+    return text[0].upper() + text[1:]
+
+
 @router.post("/warnings")
 def get_warnings(body: WarningsRequest) -> dict:
     # admin devices only while warnings are being tested
@@ -348,16 +373,18 @@ def get_warnings(body: WarningsRequest) -> dict:
     if body.day not in ("today", "tomorrow"):
         raise HTTPException(status_code=400, detail="day must be 'today' or 'tomorrow'.")
     chosen = resolve_area(body.area)
-    tz = chosen.region.timezone
-    day = chosen.region.today() + timedelta(days=1 if body.day == "tomorrow" else 0)
+    local_now = chosen.region.now()
+    day = local_now.date() + timedelta(days=1 if body.day == "tomorrow" else 0)
+    alerts = met_alerts.alerts_for(chosen, day) + nve_warnings.warnings_for(chosen, day)
+    alerts.sort(key=lambda alert: ("Extreme", "Severe", "Moderate").index(alert.severity))
     return {"warnings": [
         {
             "name": alert.name,
             "icon": _alert_icon(alert),
-            "when": f"{alert.starts.astimezone(tz):%a %H:%M} – {alert.ends.astimezone(tz):%a %H:%M}",
+            "when": alert_duration_text(alert, local_now),
             "instruction": alert.instruction,
         }
-        for alert in met_alerts.alerts_for(chosen, day) + nve_warnings.warnings_for(chosen, day)
+        for alert in alerts
     ]}
 
 

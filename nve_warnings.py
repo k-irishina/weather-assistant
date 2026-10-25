@@ -58,6 +58,8 @@ def warnings_for(area_obj: area.Area, day: date) -> list[Alert]:
                     severity={"yellow": "Moderate", "orange": "Severe", "red": "Extreme"}[color],
                     starts=starts.astimezone(timezone.utc),
                     ends=ends.astimezone(timezone.utc),
-                    instruction=warning["AdviceText"] or "",
+                    instruction="\n\n".join(
+                        text for text in (warning["WarningText"], warning["AdviceText"]) if text
+                    ),
                 ))
     return alerts
