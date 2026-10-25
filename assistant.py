@@ -187,7 +187,8 @@ def right_now_text(area_obj: area.Area, hour: time, hourly_temperatures: dict, w
         series = near_term_forecast.latest_series(area_obj)
         if series is not None and near_term_forecast.is_fresh(series, now):
             series = near_term_forecast.without_past_steps(series, now)
-            parts.append(near_term_forecast.compose_near_rain_text(series, area_obj.region.timezone))
+            rain_text = near_term_forecast.compose_near_rain_text(series, area_obj.region.timezone)
+            parts.append(rain_text[0].lower() + rain_text[1:])
     return " · ".join(parts)
 
 

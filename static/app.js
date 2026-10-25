@@ -308,10 +308,7 @@ async function loadForecast(day = 'today') {
     const rightNow = document.createElement('p');
     rightNow.className = 'right-now';
     rightNow.hidden = !data.right_now;
-    const label = document.createElement('span');
-    label.className = 'right-now-label';
-    label.textContent = 'Now';
-    rightNow.append(label, data.right_now);
+    rightNow.textContent = `Now: ${data.right_now}`;
 
     els.forecast.classList.remove('page-flip');
     void els.forecast.offsetWidth;
@@ -333,20 +330,22 @@ async function loadForecast(day = 'today') {
   }
 }
 
-const PHOTO_REFRESH_MS = 10 * 60 * 1000;
-let photoAskedFor = '';
+const PHOTO_REFRESH_MS = 20 * 60 * 1000;
+let photoArea;
+let photoPickedAt = 0;
 
-async function showPhoto() {
+async function showPhoto(comingBack = false) {
   if (!document.body.classList.contains('photo-mode')) return;
   const areaId = selectedArea ?? rememberedArea();
-  const timeSlot = Math.floor(Date.now() / PHOTO_REFRESH_MS);
-  if (`${areaId}-${timeSlot}` === photoAskedFor) return;
-  photoAskedFor = `${areaId}-${timeSlot}`;
+  const pickedLongAgo = Date.now() - photoPickedAt > PHOTO_REFRESH_MS;
+  if (areaId === photoArea && !(comingBack && pickedLongAgo)) return;
+  photoArea = areaId;
+  photoPickedAt = Date.now();
   try {
     const query = areaId === null ? '' : `?area=${areaId}`;
     const res = await fetch(`/api/background${query}`);
     const { area, link } = await res.json();
-    photoAskedFor = `${area}-${timeSlot}`;
+    photoArea = area;
     if (!link) {
       document.body.style.setProperty('--photo', 'none');
       return;
@@ -358,7 +357,7 @@ async function showPhoto() {
     };
     image.src = link;
   } catch (err) {
-    photoAskedFor = '';
+    photoArea = undefined;
   }
 }
 
@@ -421,6 +420,7 @@ const STALE_AFTER_MS = 15 * 60 * 1000;
 
 function refreshIfStale() {
   if (document.visibilityState !== 'visible') return;
+  showPhoto(true);
   const now = Date.now();
   if (now - forecastLoadedAt > STALE_AFTER_MS) {
     loadForecast(forecastDay);
