@@ -12,6 +12,7 @@ import area
 import assistant
 import db_connector as db
 import met_alerts
+import nve_warnings
 
 log = logging.getLogger(__name__)
 
@@ -113,7 +114,13 @@ async def push_morning_forecast(at: time) -> None:
             report = assistant.forecast_for_area(area_obj)
             texts = [(others, assistant.format_forecast_text_short(report))]
             if admins:
-                alerts = met_alerts.alerts_for(area_obj, area_obj.region.today())
+                today = area_obj.region.today()
+                all_alerts = met_alerts.alerts_for(area_obj, today) + nve_warnings.warnings_for(area_obj, today)
+                # only orange and red warnings and no landslides for push
+                alerts = [
+                    alert for alert in all_alerts
+                    if alert.color in ("orange", "red") and alert.kind != "landslide"
+                ]
                 texts.append((admins, assistant.format_forecast_text_short(report, alerts)))
         except Exception:
             log.exception("Could not build forecast for %s", area_obj.display_name)

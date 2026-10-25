@@ -234,7 +234,13 @@ function conditionList(items) {
       const lines = document.createElement('ul');
       for (const line of item.details) {
         const lineItem = document.createElement('li');
-        lineItem.textContent = line;
+        const icon = document.createElement('img');
+        icon.src = line.icon;
+        icon.alt = line.label;
+        icon.title = line.label;
+        icon.width = 28;
+        icon.height = 28;
+        lineItem.append(icon, line.hours);
         lines.append(lineItem);
       }
       details.append(summary, lines);

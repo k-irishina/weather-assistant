@@ -20,6 +20,7 @@ import db_connector as db
 import media_bucket
 import met_alerts
 import near_term_forecast
+import nve_warnings
 import retrieve_complete_forecast as rcf
 import web_push
 
@@ -157,6 +158,12 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
 
     uv_index = report["uv_index"]
     greeting = assistant.get_greeting(report["local_now"].hour)
+    conditions = assistant.conditions(
+        report, min_moderate_wind_hours=constants.min_significant_moderate_wind_run_hours
+    )
+    for condition in conditions:
+        for line in condition.details:
+            line["icon"] = _symbol_icon(line["symbol"])
 
     return {
         "area": report["area_name"],
@@ -188,9 +195,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
             "window_hours": [_hour(hour) for hour in report["precipitation_window_hours"]],
         },
         "wind": wind,
-        "conditions": assistant.conditions(
-            report, min_moderate_wind_hours=constants.min_significant_moderate_wind_run_hours
-        ),
+        "conditions": conditions,
     }
 
 
@@ -352,7 +357,7 @@ def get_warnings(body: WarningsRequest) -> dict:
             "when": f"{alert.starts.astimezone(tz):%a %H:%M} – {alert.ends.astimezone(tz):%a %H:%M}",
             "instruction": alert.instruction,
         }
-        for alert in met_alerts.alerts_for(chosen, day)
+        for alert in met_alerts.alerts_for(chosen, day) + nve_warnings.warnings_for(chosen, day)
     ]}
 
 

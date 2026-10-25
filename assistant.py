@@ -25,7 +25,7 @@ class WeatherCondition:
     kind: str
     emoji: str
     text: str
-    details: list[str] = field(default_factory=list)
+    details: list[dict] = field(default_factory=list)
 
 
 class ForecastReport(TypedDict):
@@ -498,13 +498,15 @@ def precipitation_conditions(
         # MET expects no rain at all in a 0 mm hour, nothing to list
         if 0 < amount < constants.moderate_rain_rate:
             light_hours.append(hour)
+    # MET's weather icons for the three levels, f.ex "heavysnow"; plain precipitation uses the rain ones
+    icon_name = "snow" if name == "snow" else "rain"
     details = []
     if heavy_hours:
-        details.append(f"Heavy {name} {format_hours(heavy_hours)}")
+        details.append({"symbol": f"heavy{icon_name}", "label": f"Heavy {name}", "hours": format_hours(heavy_hours)})
     if moderate_hours:
-        details.append(f"{name.capitalize()} {format_hours(moderate_hours)}")
+        details.append({"symbol": icon_name, "label": name.capitalize(), "hours": format_hours(moderate_hours)})
     if light_hours:
-        details.append(f"Light {name} {format_hours(light_hours)}")
+        details.append({"symbol": f"light{icon_name}", "label": f"Light {name}", "hours": format_hours(light_hours)})
     dry = hours_without_rain(rainy_hours, from_hour)
     mostly_rainy = len(rainy_hours) >= len(dry) and len(rainy_hours) >= constants.min_mostly_rainy_hours
     if mostly_rainy:
