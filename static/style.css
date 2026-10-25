@@ -368,8 +368,7 @@ select {
 .rain-heavy { background: var(--rain-heavy); }
 
 .info-button {
-  align-self: center;
-  margin-left: auto;
+  flex: none;
   padding: 0 .3rem;
   border: none;
   background: none;
@@ -788,11 +787,14 @@ body.glitter-mode .right-now {
 
 .card-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: .5rem;
 }
 
 .card-heading h2 {
+  display: inline;
   margin: 0;
 }
 
