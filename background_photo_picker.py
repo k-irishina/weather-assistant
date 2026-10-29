@@ -37,7 +37,7 @@ def photo_conditions(base: str) -> list[tuple]:
 
 
 def day_part(now: time, sunrise: time, sunset: time) -> str:
-    # evening the 2 hours before sunset, night 30 min before&after sunrise/sunset
+    # evening the 2 hours before sunset (not before 17:30, night 30 min before&after sunrise/sunset
     now = now.hour * 60 + now.minute
     sunrise = sunrise.hour * 60 + sunrise.minute
     sunset = sunset.hour * 60 + sunset.minute
@@ -45,7 +45,7 @@ def day_part(now: time, sunrise: time, sunset: time) -> str:
         return "night"
     if now >= sunset - 45:
         return "sunset"
-    if now >= sunset - 120:
+    if now >= max(sunset - 120, 17 * 60 + 30):
         return "evening"
     if now < 11 * 60:
         return "morning"
@@ -85,16 +85,19 @@ def pick_photo(names: dict[str, str], symbol_code: str, local_now: datetime, sun
     month = calendar.month_name[local_now.month].lower()
     other_months = {photo.folder for photo in photos} - {month, "night", "common"}
     folders = ["night"] if part == "night" else [month, *other_months]
+    # if nothing fits: day photos of the same weather, then any time of day; no daylight photos at night
+    parts_to_try = [part] if part == "night" else [part, "day", None]
 
-    for folder in folders:
-        for group in condition_groups:
-            doesfit = [
-                photo.name for photo in photos
-                if (photo.folder == folder or (photo.folder == "common" and folder != "night"))
-                and (photo.part == part or (photo.part is None and part != "sunset"))
-                # for now, sunset photos fit any weather
-                and (part == "sunset" or fits_weather_conditions(photo, group))
-            ]
-            if doesfit:
-                return random.choice(doesfit)
+    for wanted_part in parts_to_try:
+        for folder in folders:
+            for group in condition_groups:
+                doesfit = [
+                    photo.name for photo in photos
+                    if (photo.folder == folder or (photo.folder == "common" and folder != "night"))
+                    and (wanted_part is None or photo.part == wanted_part or (photo.part is None and wanted_part != "sunset"))
+                    # for now, sunset photos fit any weather
+                    and (wanted_part == "sunset" or fits_weather_conditions(photo, group))
+                ]
+                if doesfit:
+                    return random.choice(doesfit)
     return None
