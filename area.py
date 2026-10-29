@@ -49,6 +49,9 @@ areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO, OSLO_KOMMUNE),
           10: Area(59.9621, 10.9234, 10, 'Oslo - Stovner', OSLO, OSLO_KOMMUNE),
           11: Area(59.8948, 10.6217, 11, 'Oslo - Fornebu', AKERSHUS, BAERUM),
           12: Area(59.893003, 10.526977, 12, 'Sandvika', AKERSHUS, BAERUM),
-          13: Area(59.950569, 10.644542, 13, 'Oslo - Røa', OSLO, OSLO_KOMMUNE)
+          13: Area(59.950569, 10.644542, 13, 'Oslo - Røa', OSLO, OSLO_KOMMUNE),
+          14: Area(59.930, 10.865, 14, 'Oslo - Alna', OSLO, OSLO_KOMMUNE),
+          15: Area(59.842, 10.812, 15, 'Oslo - Søndre Nordstrand', OSLO, OSLO_KOMMUNE),
+          16: Area(59.963, 10.668, 16, 'Oslo - Holmenkollen', OSLO, OSLO_KOMMUNE)
         }
 

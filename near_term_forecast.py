@@ -151,7 +151,7 @@ def local_hhmm(moment: datetime, timezone: ZoneInfo) -> str:
 def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
     periods = rain_periods(series.steps, constants.rain_starting_rate)
     if not periods:
-        return "Dry for the next 2 hours"
+        return ""
     period = periods[0]
     names = {"light": "Light rain", "moderate": "Rain", "heavy": "Heavy rain"}
     name = names.get(level_of(peak_rate(period)), "Drizzle")

@@ -129,6 +129,7 @@ body.photo-mode footer {
   padding-top: .75rem;
   padding-bottom: .75rem;
   padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 body.photo-mode footer {
@@ -169,13 +170,13 @@ body.photo-peek main > * {
 
 header {
   position: relative;
-  padding-right: 5.2rem;
   margin-bottom: 1.25rem;
 }
 
 h1 {
   font-size: 1.4rem;
   margin: 0;
+  padding-right: 5.2rem;
 }
 
 .header-buttons {

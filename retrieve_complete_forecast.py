@@ -13,15 +13,10 @@ import yr_requests
 
 log = logging.getLogger(__name__)
 
-STORED_FORECAST_HOURS = timedelta(hours=48)
-
-
-def hourly_entries(entries: list) -> list:
-    if not entries:
-        return entries
-
-    horizon = parse_utc(entries[0]['forecast_time']) + STORED_FORECAST_HOURS
-    return [e for e in entries if parse_utc(e['forecast_time']) <= horizon]
+def hourly_entries(entries: list, user_area: area.Area) -> list:
+    day_after_tomorrow = user_area.region.today() + timedelta(days=2)
+    horizon = datetime.combine(day_after_tomorrow, time.min, tzinfo=user_area.region.timezone)
+    return [e for e in entries if parse_utc(e['forecast_time']) < horizon]
 
 
 
@@ -76,7 +71,7 @@ def fetch_forecast_for_area_id(area_id):
 
     db.log_forecast(forecast_created_at, last_modified_header, forecast_expiry_time, user_area)
 
-    hourly = hourly_entries(db_data)
+    hourly = hourly_entries(db_data, user_area)
 
     inserted = db.insert_forecast_rows(
         forecast_created_at,
