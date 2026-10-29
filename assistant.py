@@ -92,6 +92,15 @@ def period_symbol(symbols: dict[time, str], hours, tie_hour: int, daylight: int)
     return base + (Counter(dark).most_common(1)[0][0] if dark else "_night")
 
 
+def fallback_for_missing_period_data(
+    hours: tuple, end_hour: int, hourly_temperatures: dict[time, float]
+) -> tuple[Optional[float], tuple]:
+    hours_with_data = tuple(hour for hour in range(hours[0], end_hour) if time(hour) in hourly_temperatures)
+    if not hours_with_data:
+        return None, hours
+    return round(mean(hourly_temperatures[time(hour)] for hour in hours_with_data), 1), hours_with_data
+
+
 def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport:
     rcf.fetch_forecast_for_area_id(area_obj.id)
 
@@ -102,7 +111,12 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     avg_temperatures = db_connector.select_related_temperatures(area_obj, forecast_day)
     sunrise_sunset = rcf.fetch_sunset_sunrise_for_area(area_obj)
     symbols = db_connector.hourly_symbols(area_obj, forecast_day)
+    hourly_temperatures = db_connector.hourly_temperatures(area_obj, forecast_day)
+    period_ends = {key: until.hour for _, key, until in temperature_periods}
     for key, (hours, tie_hour) in constants.forecast_period_hours.items():
+        if avg_temperatures[key]["avg_temperature"] is None:
+            average, hours = fallback_for_missing_period_data(hours, period_ends[key], hourly_temperatures)
+            avg_temperatures[key]["avg_temperature"] = average
         daylight = daylight_minutes(
             hours[0], hours[-1], sunrise_sunset["sunrise_time"], sunrise_sunset["sunset_time"])
         avg_temperatures[key]["symbol_code"] = period_symbol(symbols, hours, tie_hour, daylight)
@@ -127,7 +141,6 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     uv_index = db_connector.highest_uv_index(area_obj, forecast_day)
     forecast_checked_at = db_connector.latest_forecast_check_at(area_obj)
     wind_by_hour = db_connector.evaluate_wind(area_obj, forecast_day)
-    hourly_temperatures = db_connector.hourly_temperatures(area_obj, forecast_day)
 
     from_hour = current_hour_cutoff(local_now, forecast_day)
     sunny_times = from_hour_onwards(sunny_times, from_hour)
