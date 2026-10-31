@@ -1,4 +1,8 @@
 [
+    {
+    "date": "2026-10-29",
+    "text": "Auto-detection of location closest to you is now available! If there is none close to you, users can also request for it to be added."
+  },
   {
     "date": "2026-10-29",
     "text": "Added Sandvika, Røa, Alna, Søndre Nordstrand and Holmenkollen - please feel free to suggest more locations!"
