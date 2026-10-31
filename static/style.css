@@ -978,3 +978,13 @@ div.period-tile .period-tile-value {
 .period-hours {
   margin-bottom: .75rem;
 }
+
+.period-hours .temp-hours {
+  gap: .4rem;
+}
+
+.period-hours .temp-hours li {
+  padding: .35rem 0;
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}

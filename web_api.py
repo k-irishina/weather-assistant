@@ -128,7 +128,12 @@ FIRST_PERIOD_HOUR = time(6)
 
 def _period_hours(report: assistant.ForecastReport, start: time, end: Optional[time]) -> list[dict]:
     return [
-        {"hour": _hour(hour), "temperature": _temperature(temperature)}
+        {
+            "hour": _hour(hour),
+            # "Now" for the current hour today, otherwise the hour alone: "15"
+            "label": "Now" if hour == report["from_hour"] else hour.strftime("%H"),
+            "temperature": _temperature(temperature),
+        }
         for hour, temperature in sorted(report["hourly_temperatures"].items())
         if start <= hour and (end is None or hour < end)
     ]
@@ -213,7 +218,10 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         "wind": wind,
         "conditions": conditions,
         "right_now": " · ".join(current_conditions_parts),
-        "now": current_conditions,
+        "now": (
+            None if current_conditions is None
+            else {**current_conditions, "icon": _symbol_icon(current_conditions["symbol_code"])}
+        ),
     }
 
 
@@ -250,13 +258,18 @@ def get_background(area: Optional[int] = None, current: Optional[str] = None) ->
 
 @router.get("/areas")
 def get_areas() -> dict:
-    return {
-        "default": DEFAULT_AREA.id,
-        "areas": [
-            {"id": area_obj.id, "name": area_obj.display_name}
-            for area_obj in sorted(area.areas.values(), key=lambda a: a.display_name)
-        ],
-    }
+    # grouped under the name's part before " - " ("Oslo - Torshov"), else under the region ("Lillestrøm")
+    areas = []
+    for area_obj in area.areas.values():
+        group, dash, short_name = area_obj.display_name.partition(" - ")
+        if not dash:
+            group, short_name = area_obj.region.name, area_obj.display_name
+        areas.append({"id": area_obj.id, "name": short_name, "group": group})
+
+    # the default area's group first, then the others alphabetically
+    default_group = next(a["group"] for a in areas if a["id"] == DEFAULT_AREA.id)
+    areas.sort(key=lambda a: (a["group"] != default_group, a["group"], a["name"]))
+    return {"default": DEFAULT_AREA.id, "areas": areas}
 
 
 @router.post("/closest-area")

@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 @dataclass(frozen=True)
 class Region:
+    name: str
     region_id: int
     ssb_county: int # 0 - not applicable
     timezone: ZoneInfo
@@ -26,10 +27,10 @@ class Area:
 
 
 # broad areas: a region groups the places sharing a timezone and SSB county
-OSLO = Region(region_id=101, ssb_county=3, timezone=ZoneInfo("Europe/Oslo"))
-RIGA = Region(region_id=102, ssb_county=0, timezone=ZoneInfo("Europe/Riga"))
-ROGALAND = Region(region_id=103, ssb_county=11, timezone=ZoneInfo("Europe/Oslo"))
-AKERSHUS = Region(region_id=104, ssb_county=32, timezone=ZoneInfo("Europe/Oslo"))
+OSLO = Region(name="Oslo", region_id=101, ssb_county=3, timezone=ZoneInfo("Europe/Oslo"))
+RIGA = Region(name="Riga", region_id=102, ssb_county=0, timezone=ZoneInfo("Europe/Riga"))
+ROGALAND = Region(name="Rogaland", region_id=103, ssb_county=11, timezone=ZoneInfo("Europe/Oslo"))
+AKERSHUS = Region(name="Akershus", region_id=104, ssb_county=32, timezone=ZoneInfo("Europe/Oslo"))
 
 # SSB municipality numbers
 OSLO_KOMMUNE = "0301"

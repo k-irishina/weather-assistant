@@ -32,6 +32,7 @@ class CurrentConditions(TypedDict):
     temperature: Optional[int]
     feels_like: Optional[int]
     rain: str
+    symbol_code: Optional[str]
 
 
 class ForecastReport(TypedDict):
@@ -160,6 +161,9 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     right_now = None
     if day == "today":
         right_now = right_now_reading(area_obj, from_hour, hourly_temperatures, wind_by_hour)
+        daylight = daylight_minutes(
+            from_hour.hour, from_hour.hour, sunrise_sunset["sunrise_time"], sunrise_sunset["sunset_time"])
+        right_now["symbol_code"] = period_symbol(symbols, [from_hour.hour], from_hour.hour, daylight)
 
     return ForecastReport(
         area_id=area_obj.id,
@@ -186,7 +190,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
 
 
 def right_now_reading(area_obj: area.Area, hour: time, hourly_temperatures: dict, wind_by_hour: dict) -> CurrentConditions:
-    right_now = CurrentConditions(temperature=None, feels_like=None, rain="")
+    right_now = CurrentConditions(temperature=None, feels_like=None, rain="", symbol_code=None)
     temperature = hourly_temperatures.get(hour)
     if temperature is not None:
         temperature = float(temperature)

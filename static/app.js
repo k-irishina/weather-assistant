@@ -72,15 +72,20 @@ async function setUpAreas() {
   selectedArea = remembered === null ? defaultArea : remembered;
   if (!areas.some((a) => a.id === selectedArea)) selectedArea = defaultArea;
 
-  els.areaSelect.replaceChildren(
-    ...areas.map((a) => {
-      const option = document.createElement('option');
-      option.value = a.id;
-      option.textContent = a.name;
-      option.selected = a.id === selectedArea;
-      return option;
-    })
-  );
+  const groups = new Map();
+  for (const a of areas) {
+    if (!groups.has(a.group)) {
+      const group = document.createElement('optgroup');
+      group.label = a.group;
+      groups.set(a.group, group);
+    }
+    const option = document.createElement('option');
+    option.value = a.id;
+    option.textContent = a.name;
+    option.selected = a.id === selectedArea;
+    groups.get(a.group).append(option);
+  }
+  els.areaSelect.replaceChildren(...groups.values());
   els.areaSelect.onchange = () => changeArea(Number(els.areaSelect.value));
 }
 
@@ -182,7 +187,7 @@ function periodTiles(now, temperatures) {
     const captions = [];
     if (now.feels_like !== null) captions.push(`Feels like ${now.feels_like}°`);
     if (now.rain) captions.push(now.rain[0].toUpperCase() + now.rain.slice(1));
-    tiles.append(periodTile('Now', null, `${now.temperature}°`, captions.join('. ')));
+    tiles.append(periodTile('Now', now.icon, `${now.temperature}°`, captions.join('. ')));
   }
 
   for (const period of Object.values(temperatures || {})) {
@@ -266,11 +271,11 @@ function periodCells(period) {
 function hourStrip(hours) {
   const strip = document.createElement('ol');
   strip.className = 'temp-hours';
-  for (const { hour, temperature } of hours) {
+  for (const { label, temperature } of hours) {
     const item = document.createElement('li');
     const time = document.createElement('span');
     time.className = 'temp-hour';
-    time.textContent = hour;
+    time.textContent = label;
     const value = document.createElement('span');
     value.textContent = temperature === null ? '–' : `${temperature}°`;
     item.append(time, value);
