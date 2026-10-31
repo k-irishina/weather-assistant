@@ -72,3 +72,11 @@ CREATE TABLE rain_alert_log(
 
 CREATE INDEX idx_rain_alert_log_area_sent ON rain_alert_log(area, sent_at DESC);
 
+
+CREATE TABLE location_requests(
+             latitude numeric(5, 2) NOT NULL,
+             longitude numeric(5, 2) NOT NULL,
+             requests integer NOT NULL DEFAULT 1,
+             first_requested_at timestamptz NOT NULL DEFAULT now(),
+             last_requested_at timestamptz NOT NULL DEFAULT now(),
+             PRIMARY KEY (latitude, longitude));

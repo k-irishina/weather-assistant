@@ -42,6 +42,17 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+  z-index: 10;
+}
+
 body::before {
   content: "";
   position: fixed;
@@ -100,7 +111,8 @@ body.glitter-mode #theme-toggle {
   box-shadow: 0 0 10px 2px var(--accent);
 }
 
-body.glitter-mode .temps img {
+body.glitter-mode .temps img,
+body.glitter-mode .period-tile img {
   filter: hue-rotate(300deg) saturate(1.4);
 }
 
@@ -174,7 +186,7 @@ header {
 }
 
 h1 {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   margin: 0;
   padding-right: 5.2rem;
 }
@@ -878,4 +890,91 @@ body.glitter-mode #about-toggle.has-news::after {
   height: 1.5em;
   margin-right: .4rem;
   vertical-align: -0.35em;
+}
+
+.location-row {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+}
+
+.location-row .icon-button {
+  flex-shrink: 0;
+}
+
+.locate-icon {
+  display: block;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: auto;
+  background: currentColor;
+  -webkit-mask: url('/icons/current-location.svg') center / contain no-repeat;
+  mask: url('/icons/current-location.svg') center / contain no-repeat;
+}
+
+#location-request-close {
+  margin-top: .5rem;
+}
+
+#location-request small {
+  display: block;
+  margin-top: .25rem;
+}
+
+/* admin preview for tile look */
+.period-tiles {
+  display: grid;
+  grid-template-columns: repeat(var(--tile-columns, 3), 1fr);
+  gap: .5rem;
+  margin: .5rem 0 .75rem;
+}
+
+.period-tile {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  width: 100%;
+  padding: .6rem .7rem;
+  border-radius: .6rem;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+  font-weight: 400;
+  text-align: left;
+}
+
+button.period-tile[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+
+.period-tile-label {
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+.period-tile-value {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+div.period-tile .period-tile-value {
+  font-size: 2rem;
+}
+
+.period-tile-value img {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.period-tile-caption {
+  font-size: .8rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.period-hours {
+  margin-bottom: .75rem;
 }

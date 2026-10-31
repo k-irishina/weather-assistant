@@ -70,7 +70,10 @@ def fits_weather_conditions(photo: Photo, group: tuple) -> bool:
     )
 
 
-def pick_photo(names: dict[str, str], symbol_code: str, local_now: datetime, sunrise: time, sunset: time) -> Optional[str]:
+def pick_photo(
+    names: dict[str, str], symbol_code: str, local_now: datetime, sunrise: time, sunset: time,
+    current: Optional[str] = None,
+) -> Optional[str]:
     basecondition = symbol_code.partition("_")[0]
     part = day_part(local_now.time(), sunrise, sunset)
     # so rain photos win over the sunset ones
@@ -98,6 +101,8 @@ def pick_photo(names: dict[str, str], symbol_code: str, local_now: datetime, sun
                     # for now, sunset photos fit any weather
                     and (wanted_part == "sunset" or fits_weather_conditions(photo, group))
                 ]
+                if current in doesfit:
+                    return current
                 if doesfit:
                     return random.choice(doesfit)
     return None

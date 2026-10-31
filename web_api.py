@@ -4,6 +4,7 @@ The page is the same assistant as the Telegram bot, for people who don't use
 Telegram.
 """
 import logging
+import math
 import re
 from pathlib import Path
 from datetime import datetime, time, timedelta, timezone
@@ -74,6 +75,11 @@ class WeekendMorningChange(BaseModel):
 
 class Unsubscribe(BaseModel):
     endpoint: str = Field(min_length=1)
+
+
+class Coordinates(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
 
 
 def _hour(value: time) -> str:
@@ -157,6 +163,16 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         for hour, reading in sorted(report["wind_by_hour"].items())
     ]
 
+    current_conditions = report["right_now"]
+    current_conditions_parts = []
+    if current_conditions and current_conditions["temperature"] is not None:
+        temperature_text = f"{current_conditions['temperature']}°"
+        if current_conditions["feels_like"] is not None:
+            temperature_text += f", feels like {current_conditions['feels_like']}°"
+        current_conditions_parts.append(temperature_text)
+    if current_conditions and current_conditions["rain"]:
+        current_conditions_parts.append(current_conditions["rain"])
+
     uv_index = report["uv_index"]
     greeting = assistant.get_greeting(report["local_now"].hour)
     conditions = assistant.conditions(
@@ -196,7 +212,8 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         },
         "wind": wind,
         "conditions": conditions,
-        "right_now": report["right_now"],
+        "right_now": " · ".join(current_conditions_parts),
+        "now": current_conditions,
     }
 
 
@@ -217,18 +234,18 @@ def get_near_term_forecast(area: Optional[int] = None) -> dict:
 
 
 @router.get("/background")
-def get_background(area: Optional[int] = None) -> dict:
+def get_background(area: Optional[int] = None, current: Optional[str] = None) -> dict:
     chosen = resolve_area(area)
     if not media_bucket.configured():
-        return {"area": chosen.id, "link": None}
+        return {"area": chosen.id, "name": None, "link": None}
     local_now = chosen.region.now()
     symbol = db.hourly_symbols(chosen, local_now.date()).get(time(local_now.hour), "")
     sun_times = rcf.fetch_sunset_sunrise_for_area(chosen)
     links = media_bucket.background_links()
     name = background_photo_picker.pick_photo(
-        links, symbol, local_now, sun_times["sunrise_time"], sun_times["sunset_time"]
+        links, symbol, local_now, sun_times["sunrise_time"], sun_times["sunset_time"], current
     )
-    return {"area": chosen.id, "link": links.get(name)}
+    return {"area": chosen.id, "name": name, "link": links.get(name)}
 
 
 @router.get("/areas")
@@ -240,6 +257,35 @@ def get_areas() -> dict:
             for area_obj in sorted(area.areas.values(), key=lambda a: a.display_name)
         ],
     }
+
+
+@router.post("/closest-area")
+def closest_area(place: Coordinates) -> dict:
+    closest, closest_km = None, math.inf
+    for area_obj in area.areas.values():
+        north_km = (area_obj.latitude - place.latitude) * 111.2
+        east_km = (area_obj.longtitude - place.longitude) * 111.2 * math.cos(math.radians(place.latitude))
+        distance_km = math.hypot(north_km, east_km)
+        if distance_km < closest_km:
+            closest, closest_km = area_obj, distance_km
+    if closest_km > 5:
+        return {"area": None}
+    return {"area": closest.id, "area_name": closest.display_name, "distance_km": round(closest_km, 1)}
+
+recent_location_requests: list[datetime] = []
+
+@router.post("/location-request", status_code=201)
+def request_location(place: Coordinates) -> dict:
+    now = datetime.now(timezone.utc)
+    recent_location_requests[:] = [at for at in recent_location_requests if at > now - timedelta(hours=1)]
+    if len(recent_location_requests) >= 30:
+        raise HTTPException(status_code=429, detail="Too many requests, try again later.")
+    recent_location_requests.append(now)
+
+    # rounded to about 1 km for privacy
+    db.save_location_request(round(place.latitude, 2), round(place.longitude, 2))
+    log.info("Location request stored")
+    return {"status": "requested"}
 
 
 @router.get("/vapid-key")

@@ -876,3 +876,18 @@ def log_rain_alert(
             )
             conn.commit()
 
+
+def save_location_request(latitude: float, longitude: float) -> None:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO location_requests(latitude, longitude)
+                VALUES(%s, %s)
+                ON CONFLICT (latitude, longitude) DO UPDATE SET
+                    requests = location_requests.requests + 1,
+                    last_requested_at = now();
+                """,
+                (latitude, longitude),
+            )
+            conn.commit()

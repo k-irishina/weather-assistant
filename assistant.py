@@ -28,6 +28,12 @@ class WeatherCondition:
     details: list[dict] = field(default_factory=list)
 
 
+class CurrentConditions(TypedDict):
+    temperature: Optional[int]
+    feels_like: Optional[int]
+    rain: str
+
+
 class ForecastReport(TypedDict):
     area_id: int
     area_name: str
@@ -49,7 +55,7 @@ class ForecastReport(TypedDict):
     precipitation_chances: dict[time, float]
     precipitation_amounts: dict[time, float]
     wind_by_hour: dict[time, db_connector.WindReading]
-    right_now: str
+    right_now: Optional[CurrentConditions]
 
 
 ICON_SUFFIXES = ("_day", "_night", "_polartwilight")
@@ -151,9 +157,9 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     hourly_temperatures = from_hour_onwards(hourly_temperatures, from_hour)
 
     outlook = classify_precipitation(precipitation_pct_by_hour, window_pct_by_hour)
-    right_now = ""
+    right_now = None
     if day == "today":
-        right_now = right_now_text(area_obj, from_hour, hourly_temperatures, wind_by_hour)
+        right_now = right_now_reading(area_obj, from_hour, hourly_temperatures, wind_by_hour)
 
     return ForecastReport(
         area_id=area_obj.id,
@@ -179,12 +185,12 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     )
 
 
-def right_now_text(area_obj: area.Area, hour: time, hourly_temperatures: dict, wind_by_hour: dict) -> str:
-    parts = []
+def right_now_reading(area_obj: area.Area, hour: time, hourly_temperatures: dict, wind_by_hour: dict) -> CurrentConditions:
+    right_now = CurrentConditions(temperature=None, feels_like=None, rain="")
     temperature = hourly_temperatures.get(hour)
     if temperature is not None:
         temperature = float(temperature)
-        text = f"{round_temperature(temperature)}°"
+        right_now["temperature"] = round_temperature(temperature)
         reading = wind_by_hour.get(hour)
         wind_kmh = float(reading.speed) * 3.6 if reading and reading.speed is not None else 0.0
         # wind chill formula: to be adjusted
@@ -192,8 +198,7 @@ def right_now_text(area_obj: area.Area, hour: time, hourly_temperatures: dict, w
             wind_factor = wind_kmh ** 0.16
             feels_like = 13.12 + 0.6215 * temperature - 11.37 * wind_factor + 0.3965 * temperature * wind_factor
             if round_temperature(feels_like) != round_temperature(temperature):
-                text += f", feels like {round_temperature(feels_like)}°"
-        parts.append(text)
+                right_now["feels_like"] = round_temperature(feels_like)
 
     if near_term_forecast.is_covered(area_obj):
         now = datetime.now(timezone.utc)
@@ -202,8 +207,8 @@ def right_now_text(area_obj: area.Area, hour: time, hourly_temperatures: dict, w
             series = near_term_forecast.without_past_steps(series, now)
             rain_text = near_term_forecast.compose_near_rain_text(series, area_obj.region.timezone)
             if rain_text:
-                parts.append(rain_text[0].lower() + rain_text[1:])
-    return " · ".join(parts)
+                right_now["rain"] = rain_text[0].lower() + rain_text[1:]
+    return right_now
 
 
 def with_radar_amounts(area_obj: area.Area, forecast_day: date, amounts: dict[time, float]) -> dict[time, float]:

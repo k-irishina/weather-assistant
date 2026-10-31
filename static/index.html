@@ -92,8 +92,8 @@
       </div>
       <div id="rain-info" class="rain-info" hidden>
         <ul class="rain-legend" id="rain-legend"></ul>
-        <p class="muted">A bar is 5 minutes. The darker the colour and the taller the bar, the heavier the rain. Fetched in
-          real-time, more certain closer to now.</p>
+        <p class="muted">A bar is 5 minutes. The darker the colour and the taller the bar, the heavier the rain. Fetched
+          in real-time, more certain closer to now.</p>
       </div>
       <div class="rain-strip">
         <div class="rain-bars" id="rain-bars" role="img"
@@ -105,9 +105,20 @@
     <section class="card">
       <h2>Location</h2>
       <label class="sr-only" for="area-select">Forecast location</label>
-      <select id="area-select">
-        <option>Loading…</option>
-      </select>
+      <div class="location-row">
+        <select id="area-select">
+          <option>Loading…</option>
+        </select>
+        <button id="locate-button" class="icon-button" type="button" aria-label="Use my location"
+          title="Use my location"><span class="locate-icon" aria-hidden="true"></span></button>
+      </div>
+      <div id="location-request" hidden>
+        <p>Your location isn't supported yet - would you like to request for it to be added?
+          <small class="muted">Approximate location will be sent to our server without any of your personal data.</small>
+        </p>
+        <button id="location-request-button" type="button">Send request</button>
+        <button id="location-request-close" class="secondary" type="button">Not now</button>
+      </div>
       <p class="muted" id="area-note"></p>
     </section>
 
@@ -163,6 +174,7 @@
     </footer>
   </main>
   <script src="/app.js"></script>
+  <script src="/location.js"></script>
 </body>
 
 </html>

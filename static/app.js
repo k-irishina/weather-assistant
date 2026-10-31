@@ -41,6 +41,8 @@ const els = {
 
 let registration = null;
 let selectedArea = null;
+// admin devices try the forecast as tiles
+let tilePreview = false;
 
 // if not subscribed, enables us to keep users location in browser
 const AREA_KEY = 'weather-assistant-area';
@@ -166,6 +168,74 @@ function temperatureList(temperatures) {
     list.append(row);
   }
   return list;
+}
+
+function periodTiles(now, temperatures) {
+  const wrapper = document.createElement('div');
+  const tiles = document.createElement('div');
+  tiles.className = 'period-tiles';
+  const hoursPanel = document.createElement('div');
+  hoursPanel.className = 'period-hours';
+  hoursPanel.hidden = true;
+
+  if (now && now.temperature !== null) {
+    const captions = [];
+    if (now.feels_like !== null) captions.push(`Feels like ${now.feels_like}°`);
+    if (now.rain) captions.push(now.rain[0].toUpperCase() + now.rain.slice(1));
+    tiles.append(periodTile('Now', null, `${now.temperature}°`, captions.join('. ')));
+  }
+
+  for (const period of Object.values(temperatures || {})) {
+    const value = period.temperature === null ? 'no data' : `${period.temperature}°`;
+    const tile = periodTile(period.label, period.icon, value, '');
+    if (period.hours && period.hours.length) {
+      tile.setAttribute('aria-expanded', 'false');
+      tile.onclick = () => {
+        const opening = tile.getAttribute('aria-expanded') === 'false';
+        for (const other of tiles.querySelectorAll('[aria-expanded]')) other.setAttribute('aria-expanded', 'false');
+        tile.setAttribute('aria-expanded', String(opening));
+        hoursPanel.replaceChildren(hourStrip(period.hours));
+        hoursPanel.hidden = !opening;
+      };
+    }
+    tiles.append(tile);
+  }
+
+  // up to three tiles side by side; four make a 2 x 2 grid
+  const count = tiles.children.length;
+  tiles.style.setProperty('--tile-columns', count === 4 ? 2 : count);
+  wrapper.append(tiles, hoursPanel);
+  return wrapper;
+}
+
+function periodTile(label, icon, value, caption) {
+  const tile = document.createElement(label === 'Now' ? 'div' : 'button');
+  tile.className = 'period-tile';
+  if (tile.tagName === 'BUTTON') tile.type = 'button';
+
+  const name = document.createElement('span');
+  name.className = 'period-tile-label';
+  name.textContent = label;
+  tile.append(name);
+
+  const reading = document.createElement('span');
+  reading.className = 'period-tile-value';
+  if (icon) {
+    const img = document.createElement('img');
+    img.src = icon;
+    img.alt = '';
+    reading.append(img);
+  }
+  reading.append(value);
+  tile.append(reading);
+
+  if (caption) {
+    const note = document.createElement('span');
+    note.className = 'period-tile-caption';
+    note.textContent = caption;
+    tile.append(note);
+  }
+  return tile;
 }
 
 function periodCells(period) {
@@ -312,10 +382,12 @@ async function loadForecast(day = 'today') {
 
     els.forecast.classList.remove('page-flip');
     void els.forecast.offsetWidth;
+    const periods = tilePreview
+      ? [periodTiles(data.now, data.temperatures)]
+      : [rightNow, temperatureList(data.temperatures)];
     els.forecast.replaceChildren(
       headingRow,
-      rightNow,
-      temperatureList(data.temperatures),
+      ...periods,
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
@@ -332,6 +404,7 @@ async function loadForecast(day = 'today') {
 
 const PHOTO_REFRESH_MS = 20 * 60 * 1000;
 let photoArea;
+let photoName = null;
 let photoPickedAt = 0;
 
 async function showPhoto(comingBack = false) {
@@ -342,10 +415,15 @@ async function showPhoto(comingBack = false) {
   photoArea = areaId;
   photoPickedAt = Date.now();
   try {
-    const query = areaId === null ? '' : `?area=${areaId}`;
-    const res = await fetch(`/api/background${query}`);
-    const { area, link } = await res.json();
+    // keep the current photo if it still fits
+    const params = new URLSearchParams();
+    if (areaId !== null) params.set('area', areaId);
+    if (photoName) params.set('current', photoName);
+    const res = await fetch(`/api/background?${params}`);
+    const { area, name, link } = await res.json();
     photoArea = area;
+    if (name === photoName && link) return;
+    photoName = name;
     if (!link) {
       document.body.style.setProperty('--photo', 'none');
       return;
@@ -696,6 +774,8 @@ async function showSubscriptionOptions() {
     updatePushSummary();
 
     if (!isAdmin) return;
+    tilePreview = true;
+    loadForecast(forecastDay);
     els.testButton.hidden = false;
     els.testButton.disabled = false;
     els.testButton.textContent = 'Send a test notification';
