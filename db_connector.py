@@ -64,7 +64,7 @@ def insert_forecast_rows(created_at, area: area.Area, rows) -> int:
     return len(values)
 
 
-def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offset=0):
+def select_forecast_run(area: area.Area, issued_before: datetime, until: datetime):
     query = """
                 SELECT forecast_created_at, forecast_time, forecast_data
                 FROM forecast_complete
@@ -72,10 +72,10 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
                   AND forecast_created_at = (
                       SELECT MAX(forecast_created_at)
                       FROM forecast_complete
-                      WHERE forecast_created_at <= NOW() - make_interval(hours => %(hour_offset)s)
+                      WHERE forecast_created_at <= %(issued_before)s
                         AND area = %(area)s
                   )
-                  AND forecast_time BETWEEN NOW() AND NOW() + make_interval(hours => %(next_hours)s)
+                  AND forecast_time < %(until)s
             """
 
     timezone = area.region.timezone
@@ -85,8 +85,8 @@ def select_previous_forecast_for_x_hrs(area: area.Area, next_hours=12, hour_offs
                 query,
                 {
                     "area": area.id,
-                    "hour_offset": hour_offset,
-                    "next_hours": next_hours,
+                    "issued_before": issued_before,
+                    "until": until,
                 },
             )
             records = cursor.fetchall()

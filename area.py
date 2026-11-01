@@ -25,6 +25,10 @@ class Area:
         self.region = region
         self.municipality = municipality
 
+    def group_and_short_name(self) -> tuple[str, str]:
+        group, dash, short_name = self.display_name.partition(" - ")
+        return (group, short_name) if dash else (self.region.name, self.display_name)
+
 
 # broad areas: a region groups the places sharing a timezone and SSB county
 OSLO = Region(name="Oslo", region_id=101, ssb_county=3, timezone=ZoneInfo("Europe/Oslo"))

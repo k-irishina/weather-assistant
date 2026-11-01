@@ -201,7 +201,7 @@ def right_now_reading(area_obj: area.Area, hour: time, hourly_temperatures: dict
         if temperature <= 10 and wind_kmh >= 4.8:
             wind_factor = wind_kmh ** 0.16
             feels_like = 13.12 + 0.6215 * temperature - 11.37 * wind_factor + 0.3965 * temperature * wind_factor
-            if round_temperature(feels_like) != round_temperature(temperature):
+            if abs(round_temperature(feels_like) - round_temperature(temperature)) >= 2:
                 right_now["feels_like"] = round_temperature(feels_like)
 
     if near_term_forecast.is_covered(area_obj):
@@ -673,48 +673,50 @@ def detect_sun_change(user_id):
 
 
 def detect_sun_change_for_area(select_area: area.Area):
-    # get previous forecast (time fetched < 10AM local time of the day)
-    hours_since_cutoff = select_area.region.now().hour - 10
-
-    if hours_since_cutoff < 0:
-        log.debug('No changes to analyse yet, offset:' + str(hours_since_cutoff))
+    local_now = select_area.region.now()
+    # the morning push is built from the last run before the last early push, as for rain alerts
+    last_early_push = max(
+        at for at in constants.morning_push_times if at.hour < constants.quiet_hours_end
+    )
+    pushed_at = datetime.combine(local_now.date(), last_early_push, tzinfo=local_now.tzinfo)
+    if local_now < pushed_at:
+        log.debug('No morning push to compare with yet')
         return None
 
     rcf.fetch_forecast_for_area_id(select_area.id)
-    previous_forecast = db_connector.select_previous_forecast_for_x_hrs(
-        select_area, 12, hours_since_cutoff
-    )
-    latest_forecast = db_connector.select_previous_forecast_for_x_hrs(
-        select_area, 12, 0
-    )
+    sun_times = rcf.fetch_sunset_sunrise_for_area(select_area)
+    sunset = datetime.combine(local_now.date(), sun_times["sunset_time"], tzinfo=local_now.tzinfo)
+    pushed_forecast = db_connector.select_forecast_run(select_area, pushed_at, sunset)
+    latest_forecast = db_connector.select_forecast_run(select_area, local_now, sunset)
 
-    if not previous_forecast or not latest_forecast:
+    if not pushed_forecast or not latest_forecast:
         log.info('Not enough stored forecasts to compare yet')
         return None
 
-    previous_forecast_at = previous_forecast[0]['created_at']
+    pushed_forecast_at = pushed_forecast[0]['created_at']
     latest_forecast_at = latest_forecast[0]['created_at']
-    log.info(f"previous forecast at: {previous_forecast_at}, last at {latest_forecast_at}")
+    log.info(f"morning push forecast at: {pushed_forecast_at}, last at {latest_forecast_at}")
 
-    if previous_forecast_at == latest_forecast_at:
+    if pushed_forecast_at == latest_forecast_at:
         log.debug('No changes to analyse yet')
         return None
 
+    latest_run_hour = datetime.fromisoformat(latest_forecast_at).replace(minute=0, second=0)
     now_sunny_at = compare_two_forecasts(
-        group_by_time(previous_forecast), group_by_time(latest_forecast)
+        group_by_time(pushed_forecast), group_by_time(latest_forecast),
+        latest_run_hour, sun_times["sunrise_time"], sun_times["sunset_time"],
     )
     if not now_sunny_at:
         log.info('No hours turned sunny between the two forecasts')
         return None
 
-    hours = ", ".join(format_hour(entry) for entry in sorted(now_sunny_at))
-    return f"""
-Two forecasts were compared: {previous_forecast_at} and {latest_forecast_at}.
-It is now going to be sunnier at {hours}
-"""
+    hours = format_hours(sorted(moment.time() for moment in now_sunny_at))
+    return f"Sunnier than this morning's forecast: {hours}"
 
 
-def compare_two_forecasts(g_previous_forecast: dict, g_current_forecast: dict) -> list:
+def compare_two_forecasts(
+    g_previous_forecast: dict, g_current_forecast: dict, from_hour: datetime, sunrise: time, sunset: time
+) -> list:
     now_sunny_at = []
     for timet in set(g_previous_forecast.keys()).union(g_current_forecast.keys()):
         json_previous = g_previous_forecast.get(timet)
@@ -728,10 +730,14 @@ def compare_two_forecasts(g_previous_forecast: dict, g_current_forecast: dict) -
             continue
 
         datetimet = datetime.fromisoformat(timet)
-        if not (time(7, 0) <= datetimet.time() <= time(17, 0)):
+        if datetimet < from_hour:
+            continue
+        if daylight_minutes(datetimet.hour, datetimet.hour, sunrise, sunset) < 30:
             continue
 
-        if not calculate_if_sunny(json_previous) and calculate_if_sunny(json_latest):
+        total_clouds = json_latest.get('cloud_area_fraction')
+        definitely_sunny = total_clouds is not None and float(total_clouds) < constants.max_total_clouds
+        if not calculate_if_sunny(json_previous) and definitely_sunny:
             log.info(f'Cloud change detected at {timet}')
             now_sunny_at.append(datetimet)
 

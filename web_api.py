@@ -169,14 +169,6 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     ]
 
     current_conditions = report["right_now"]
-    current_conditions_parts = []
-    if current_conditions and current_conditions["temperature"] is not None:
-        temperature_text = f"{current_conditions['temperature']}°"
-        if current_conditions["feels_like"] is not None:
-            temperature_text += f", feels like {current_conditions['feels_like']}°"
-        current_conditions_parts.append(temperature_text)
-    if current_conditions and current_conditions["rain"]:
-        current_conditions_parts.append(current_conditions["rain"])
 
     uv_index = report["uv_index"]
     greeting = assistant.get_greeting(report["local_now"].hour)
@@ -188,7 +180,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
             line["icon"] = _symbol_icon(line["symbol"])
 
     return {
-        "area": report["area_name"],
+        "area": area.areas[report["area_id"]].group_and_short_name()[1],
         "day": report["forecast_day"].isoformat(),
         "generated_at": report["local_now"].isoformat(),
         "updated_at": (
@@ -217,7 +209,6 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
         },
         "wind": wind,
         "conditions": conditions,
-        "right_now": " · ".join(current_conditions_parts),
         "now": (
             None if current_conditions is None
             else {**current_conditions, "icon": _symbol_icon(current_conditions["symbol_code"])}
@@ -258,17 +249,12 @@ def get_background(area: Optional[int] = None, current: Optional[str] = None) ->
 
 @router.get("/areas")
 def get_areas() -> dict:
-    # grouped under the name's part before " - " ("Oslo - Torshov"), else under the region ("Lillestrøm")
     areas = []
     for area_obj in area.areas.values():
-        group, dash, short_name = area_obj.display_name.partition(" - ")
-        if not dash:
-            group, short_name = area_obj.region.name, area_obj.display_name
+        group, short_name = area_obj.group_and_short_name()
         areas.append({"id": area_obj.id, "name": short_name, "group": group})
 
-    # the default area's group first, then the others alphabetically
-    default_group = next(a["group"] for a in areas if a["id"] == DEFAULT_AREA.id)
-    areas.sort(key=lambda a: (a["group"] != default_group, a["group"], a["name"]))
+    areas.sort(key=lambda a: (a["group"] != "Oslo", a["group"], a["name"]))
     return {"default": DEFAULT_AREA.id, "areas": areas}
 
 

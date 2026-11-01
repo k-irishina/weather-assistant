@@ -41,8 +41,6 @@ const els = {
 
 let registration = null;
 let selectedArea = null;
-// admin devices try the forecast as tiles
-let tilePreview = false;
 
 // if not subscribed, enables us to keep users location in browser
 const AREA_KEY = 'weather-assistant-area';
@@ -152,29 +150,6 @@ async function changeArea(areaId) {
   }
 }
 
-function temperatureList(temperatures) {
-  const list = document.createElement('ul');
-  list.className = 'temps';
-
-  for (const period of Object.values(temperatures || {})) {
-    const row = document.createElement('li');
-    const cells = periodCells(period);
-
-    if (period.hours && period.hours.length) {
-      const details = document.createElement('details');
-      details.className = 'temp-period';
-      const summary = document.createElement('summary');
-      summary.append(...cells);
-      details.append(summary, hourStrip(period.hours));
-      row.append(details);
-    } else {
-      row.append(...cells);
-    }
-    list.append(row);
-  }
-  return list;
-}
-
 function periodTiles(now, temperatures) {
   const wrapper = document.createElement('div');
   const tiles = document.createElement('div');
@@ -241,31 +216,6 @@ function periodTile(label, icon, value, caption) {
     tile.append(note);
   }
   return tile;
-}
-
-function periodCells(period) {
-  const cells = [];
-  if (period.icon) {
-    const img = document.createElement('img');
-    img.src = period.icon;
-    img.width = 40;
-    img.height = 40;
-    img.alt = '';
-    cells.push(img);
-  }
-
-  const label = document.createElement('span');
-  label.className = 'temp-label';
-  label.textContent = period.label;
-
-  const value = document.createElement('span');
-  value.className = 'temp-value';
-  value.textContent = period.temperature === null
-    ? 'no data'
-    : `${period.temperature} °C`;
-
-  cells.push(label, value);
-  return cells;
 }
 
 function hourStrip(hours) {
@@ -380,19 +330,11 @@ async function loadForecast(day = 'today') {
       headingRow.append(dayFlipButton('‹ Today', 'today'));
     }
 
-    const rightNow = document.createElement('p');
-    rightNow.className = 'right-now';
-    rightNow.hidden = !data.right_now;
-    rightNow.textContent = `Now: ${data.right_now}`;
-
     els.forecast.classList.remove('page-flip');
     void els.forecast.offsetWidth;
-    const periods = tilePreview
-      ? [periodTiles(data.now, data.temperatures)]
-      : [rightNow, temperatureList(data.temperatures)];
     els.forecast.replaceChildren(
       headingRow,
-      ...periods,
+      periodTiles(data.now, data.temperatures),
       conditionList(data.conditions),
     );
     els.forecast.classList.add('page-flip');
@@ -779,8 +721,6 @@ async function showSubscriptionOptions() {
     updatePushSummary();
 
     if (!isAdmin) return;
-    tilePreview = true;
-    loadForecast(forecastDay);
     els.testButton.hidden = false;
     els.testButton.disabled = false;
     els.testButton.textContent = 'Send a test notification';

@@ -1,6 +1,10 @@
 [
     {
-    "date": "2026-10-29",
+    "date": "2026-11-01",
+    "text": "Tile view for the main forecast tab and other visual improvements, and better sun updates."
+  },
+  {
+    "date": "2026-10-31",
     "text": "Auto-detection of location closest to you is now available! If there is none close to you, users can also request for it to be added."
   },
   {
