@@ -10,6 +10,7 @@ import db_connector as db
 import json_processor
 from json_processor import parse_http_date, parse_utc
 import yr_requests
+import requests
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +50,18 @@ def fetch_forecast_for_area_id(area_id):
     log.info('Response from API: ' + str(response.status_code))
     log.debug('Headers: ' + str(response.headers))
     
-    data = response.json()
+    try:
+        data = response.json()
+    except requests.exceptions.JSONDecodeError as e:
+        log.warning("Bad JSON for %s, keeping old forecast: %s | tail: %r",
+                    user_area.display_name, e, response.text[-300:])
+        return
+
+    timeseries = data.get("properties", {}).get("timeseries") if isinstance(data, dict) else None
+    if not timeseries:
+        log.warning("Error payload for %s, keeping old forecast: %r",
+                    user_area.display_name, str(data)[:300])
+        return
     
     # for now, also storing full data into a file
     BASE_DIR = Path(__file__).resolve().parent
