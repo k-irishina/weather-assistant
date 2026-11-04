@@ -344,7 +344,9 @@ Forecast for {day_text}, {report["area_name"]}:
 
 
 def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list["WeatherCondition"]:
-    items = sunny_conditions(report["sunny_times"], report["from_hour"])
+    sunset = report["sunrise_sunset"]["sunset_time"].replace(tzinfo=None)
+    today_after_sunset = report["from_hour"] is not None and report["local_now"].time() >= sunset
+    items = [] if today_after_sunset else sunny_conditions(report["sunny_times"], report["from_hour"])
     items += precipitation_conditions(
         report["precipitation_high"], report["precipitation_possible"],
         report["precipitation_window"], report["precipitation_window_hours"],
