@@ -126,35 +126,42 @@ def _symbol_icon(symbol_code: Optional[str]) -> Optional[str]:
 FIRST_PERIOD_HOUR = time(6)
 
 
-def _period_hours(report: assistant.ForecastReport, start: time, end: Optional[time]) -> list[dict]:
+def _period_hours(
+    hourly_temperatures: dict, start: time, end: Optional[time], current_hour: Optional[time]
+) -> list[dict]:
     return [
-        {
-            "hour": _hour(hour),
-            # "Now" for the current hour today, otherwise the hour alone: "15"
-            "label": "Now" if hour == report["from_hour"] else hour.strftime("%H"),
-            "temperature": _temperature(temperature),
-        }
-        for hour, temperature in sorted(report["hourly_temperatures"].items())
-        if start <= hour and (end is None or hour < end)
+        {"label": hour.strftime("%H"), "temperature": _temperature(temperature)}
+        for hour, temperature in sorted(hourly_temperatures.items())
+        if start <= hour and (end is None or hour < end) and hour != current_hour
     ]
 
 
 def forecast_payload(report: assistant.ForecastReport) -> dict:
-    cutoff = report["from_hour"]
     periods = assistant.temperature_periods
     starts = [FIRST_PERIOD_HOUR] + [until for _, _, until in periods[:-1]]
     ends = [until for _, _, until in periods[:-1]] + [None]
-    temperatures = {
-        key: {
-            "label": label,
-            "temperature": _temperature(report["temperatures"][key]["avg_temperature"]),
-            "symbol_code": report["temperatures"][key].get("symbol_code"),
-            "icon": _symbol_icon(report["temperatures"][key].get("symbol_code")),
-            "hours": _period_hours(report, start, end),
+    temperatures = {}
+    for start, end, (label, key, _) in zip(starts, ends, periods):
+        hours = _period_hours(report["hourly_temperatures"], start, end, report["from_hour"])
+        if key in report["temperatures"] and hours:
+            temperatures[key] = {
+                "label": label,
+                "temperature": _temperature(report["temperatures"][key]["avg_temperature"]),
+                "icon": _symbol_icon(report["temperatures"][key].get("symbol_code")),
+                "hours": hours,
+            }
+
+    # visible for 21-05
+    night = report["night"]
+    if night:
+        night_tile = {
+            "label": "Night",
+            "temperature": _temperature(night["avg_temperature"]),
+            "icon": _symbol_icon(night["symbol_code"]),
+            "hours": _period_hours(night["hourly_temperatures"], time(0), None, report["from_hour"]),
         }
-        for start, end, (label, key, until) in zip(starts, ends, periods)
-        if key in report["temperatures"] and (cutoff is None or until > cutoff)
-    }
+        after_midnight = report["local_now"].hour < 5
+        temperatures = {"night": night_tile, **temperatures} if after_midnight else {**temperatures, "night": night_tile}
 
     wind = [
         {

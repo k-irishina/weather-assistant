@@ -181,9 +181,8 @@ function periodTiles(now, temperatures) {
     tiles.append(tile);
   }
 
-  // up to three tiles side by side; four make a 2 x 2 grid
   const count = tiles.children.length;
-  tiles.style.setProperty('--tile-columns', count === 4 ? 2 : count);
+  tiles.style.setProperty('--tile-columns', count === 4 ? 2 : Math.min(count, 3));
   wrapper.append(tiles, hoursPanel);
   return wrapper;
 }

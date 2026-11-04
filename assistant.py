@@ -35,6 +35,12 @@ class CurrentConditions(TypedDict):
     symbol_code: Optional[str]
 
 
+class NightForecast(TypedDict):
+    avg_temperature: Optional[float]
+    symbol_code: Optional[str]
+    hourly_temperatures: dict[time, float]
+
+
 class ForecastReport(TypedDict):
     area_id: int
     area_name: str
@@ -57,6 +63,7 @@ class ForecastReport(TypedDict):
     precipitation_amounts: dict[time, float]
     wind_by_hour: dict[time, db_connector.WindReading]
     right_now: Optional[CurrentConditions]
+    night: Optional[NightForecast]
 
 
 ICON_SUFFIXES = ("_day", "_night", "_polartwilight")
@@ -165,6 +172,28 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
             from_hour.hour, from_hour.hour, sunrise_sunset["sunrise_time"], sunrise_sunset["sunset_time"])
         right_now["symbol_code"] = period_symbol(symbols, [from_hour.hour], from_hour.hour, daylight)
 
+    night_temperatures, night_symbols = {}, {}
+    if day == "today" and local_now.hour >= 21:
+        next_day = forecast_day + timedelta(days=1)
+        night_temperatures = {
+            hour: temperature
+            for hour, temperature in db_connector.hourly_temperatures(area_obj, next_day).items()
+            if hour.hour < 6
+        }
+        night_symbols = db_connector.hourly_symbols(area_obj, next_day)
+    if day == "today" and local_now.hour < 5:
+        night_temperatures = {hour: temperature for hour, temperature in hourly_temperatures.items() if hour.hour < 6}
+        night_symbols = symbols
+
+    night = None
+    averaged_hours = [hour.hour for hour in sorted(night_temperatures) if hour.hour < 5]
+    if averaged_hours:
+        night = NightForecast(
+            avg_temperature=round(mean(night_temperatures[time(hour)] for hour in averaged_hours), 1),
+            symbol_code=period_symbol(night_symbols, averaged_hours, 3, 0),
+            hourly_temperatures=night_temperatures,
+        )
+
     return ForecastReport(
         area_id=area_obj.id,
         area_name=area_obj.display_name,
@@ -186,6 +215,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         precipitation_amounts=precipitation_amounts,
         wind_by_hour=wind_by_hour,
         right_now=right_now,
+        night=night,
     )
 
 
