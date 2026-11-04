@@ -91,13 +91,11 @@ def fetch_and_store(area_obj: area.Area):
                   area_obj.display_name)
         return None
 
-    response = yr_requests.get_nowcast(area_obj)
-    if response.status_code != 200:
-        log.warning("Near-term forecast for %s returned %s",
-                    area_obj.display_name, response.status_code)
+    payload = yr_requests.valid_met_json(yr_requests.get_nowcast(area_obj), "properties")
+    if payload is None:
         return None
 
-    series = parse_near_term_forecast(response.json())
+    series = parse_near_term_forecast(payload)
     # "temporarily unavailable" or "no coverage" means radar is off
     if series.radar_coverage != "ok":
         return None

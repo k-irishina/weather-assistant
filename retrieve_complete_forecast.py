@@ -10,9 +10,10 @@ import db_connector as db
 import json_processor
 from json_processor import parse_http_date, parse_utc
 import yr_requests
-import requests
 
 log = logging.getLogger(__name__)
+
+_failed_at: dict[int, datetime] = {}
 
 def hourly_entries(entries: list, user_area: area.Area) -> list:
     day_after_tomorrow = user_area.region.today() + timedelta(days=2)
@@ -23,6 +24,11 @@ def hourly_entries(entries: list, user_area: area.Area) -> list:
 
 def fetch_forecast_for_area_id(area_id):
     user_area = area.areas.get(area_id, area.areas[constants.default_area_id])
+
+    failed_at = _failed_at.get(user_area.id)
+    if failed_at and datetime.now(timezone.utc) - failed_at < timedelta(minutes=10):
+        log.info("MET failed for %s, reusing the stored forecast", user_area.display_name)
+        return
 
     last_fetch = db.forecast_update_log(user_area)
     
@@ -39,30 +45,20 @@ def fetch_forecast_for_area_id(area_id):
         log.info(f"Last modified: {last_modified}")
     
     response = yr_requests.get_weather_complete(user_area, last_modified)
-    if response.status_code == 304:
+    if response is not None and response.status_code == 304:
         expires = response.headers.get('Expires')
         db.record_forecast_check(user_area, parse_http_date(expires) if expires else None)
         return
-    elif response.status_code != 200:
-        log.warning("Forecast for %s returned %s", user_area.display_name, response.status_code)
-        return
-    
-    log.info('Response from API: ' + str(response.status_code))
-    log.debug('Headers: ' + str(response.headers))
-    
-    try:
-        data = response.json()
-    except requests.exceptions.JSONDecodeError as e:
-        log.warning("Bad JSON for %s, keeping old forecast: %s | tail: %r",
-                    user_area.display_name, e, response.text[-300:])
-        return
 
-    timeseries = data.get("properties", {}).get("timeseries") if isinstance(data, dict) else None
+    data = yr_requests.valid_met_json(response, "properties")
+    timeseries = data["properties"].get("timeseries") if data else None
     if not timeseries:
-        log.warning("Error payload for %s, keeping old forecast: %r",
-                    user_area.display_name, str(data)[:300])
+        log.error("Error payload %s, keeping old forecast", user_area.display_name)
+        _failed_at[user_area.id] = datetime.now(timezone.utc)
         return
-    
+    _failed_at.pop(user_area.id, None)
+    log.debug('Headers: ' + str(response.headers))
+
     # for now, also storing full data into a file
     BASE_DIR = Path(__file__).resolve().parent
     DATA_DIR = BASE_DIR / "data"
@@ -78,8 +74,10 @@ def fetch_forecast_for_area_id(area_id):
     db_data = json_processor.create_data_json(data)
 
     # audit
-    last_modified_header = parse_http_date(response.headers['Last-Modified'])
-    forecast_expiry_time = parse_http_date(response.headers['Expires'])
+    last_modified_text = response.headers.get('Last-Modified')
+    expires_text = response.headers.get('Expires')
+    last_modified_header = parse_http_date(last_modified_text) if last_modified_text else None
+    forecast_expiry_time = parse_http_date(expires_text) if expires_text else None
 
     db.log_forecast(forecast_created_at, last_modified_header, forecast_expiry_time, user_area)
 

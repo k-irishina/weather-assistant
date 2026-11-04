@@ -1,5 +1,9 @@
 [
-    {
+  {
+    "date": "2026-11-04",
+    "text": "Improved resilience of MET outages."
+  },
+  {
     "date": "2026-11-01",
     "text": "Tile view for the main forecast tab and other visual improvements, and better sun updates."
   },

@@ -18,13 +18,21 @@ def get_warnings(kind: str, municipality: str) -> Optional[list]:
     headers = {"User-Agent": app_config.met_api["user-agent-header"], "Accept": "application/json"}
     try:
         response = requests.get(url, headers=headers, timeout=10)
-    except requests.RequestException:
-        log.warning("NVE %s warnings could not be fetched", kind, exc_info=True)
+    except requests.RequestException as error:
+        log.error("NVE %s warnings could not be fetched: %s", kind, error)
         return None
     if response.status_code != 200:
-        log.warning("NVE %s warnings returned %s", kind, response.status_code)
+        log.error("NVE %s warnings returned %s", kind, response.status_code)
         return None
-    return response.json()
+    try:
+        warnings = response.json()
+    except requests.exceptions.JSONDecodeError:
+        log.error("NVE %s warnings sent invalid JSON: %r", kind, response.text[:300])
+        return None
+    if not isinstance(warnings, list):
+        log.error("NVE %s warnings sent no list: %r", kind, str(warnings)[:300])
+        return None
+    return warnings
 
 
 def warnings_for(area_obj: area.Area, day: date) -> list[Alert]:
