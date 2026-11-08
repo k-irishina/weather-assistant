@@ -166,9 +166,7 @@ body.photo-mode h2 {
 
 body.photo-mode .icon-button,
 body.photo-mode select {
-  background-color: color-mix(in srgb, var(--card) 65%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background-color: color-mix(in srgb, var(--card) 30%, transparent);
   border-color: rgb(255 255 255 / 55%);
 }
 
@@ -1018,7 +1016,7 @@ h1[data-sky-colours="sunset"] { --sky-from: #aa4b10; --sky-to: #aa1622; }
 h1[data-sky-colours="snow"] { --sky-from: #396a8b; --sky-to: #194b66; }
 h1[data-sky-colours="rain"] { --sky-from: #24589a; --sky-to: #33689f; }
 h1[data-sky-colours="sunny"] { --sky-from: #8f4a00; --sky-to: #ac6b03; }
-h1[data-sky-colours="cloudy"] { --sky-from: #45566e; --sky-to: #6a7e99; }
+h1[data-sky-colours="cloudy"] { --sky-from: #3b5a8c; --sky-to: #5458a5; }
 
 @media (prefers-color-scheme: dark) {
   h1[data-sky-colours="night"] { --sky-from: #9aa8ff; --sky-to: #b08bfb; }
@@ -1027,5 +1025,5 @@ h1[data-sky-colours="cloudy"] { --sky-from: #45566e; --sky-to: #6a7e99; }
   h1[data-sky-colours="snow"] { --sky-from: #a9d4ea; --sky-to: #cfe7f3; }
   h1[data-sky-colours="rain"] { --sky-from: #8bb8f0; --sky-to: #b0d0f7; }
   h1[data-sky-colours="sunny"] { --sky-from: #f69356; --sky-to: #ffdc7a; }
-  h1[data-sky-colours="cloudy"] { --sky-from: #8ea2bf; --sky-to: #d0dae6; }
+  h1[data-sky-colours="cloudy"] { --sky-from: #a9c1ec; --sky-to: #8877ae; }
 }
