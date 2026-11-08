@@ -300,10 +300,7 @@ async function loadForecast(day = 'today') {
     const res = await fetch(query ? `/api/forecast?${query}` : '/api/forecast');
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
-    if (data.sky_colours) {
-      document.querySelector('h1').dataset.skyColours = data.sky_colours;
-      els.place.dataset.skyColours = data.sky_colours;
-    }
+    if (data.sky_colours) document.body.dataset.skyColours = data.sky_colours;
     forecastDay = day;
 
     const [sunrise, sunset] = [['🌅', data.sunrise], ['🌇', data.sunset]].map(([emoji, hour]) => {
