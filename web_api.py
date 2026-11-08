@@ -23,6 +23,7 @@ import media_bucket
 import met_alerts
 import near_term_forecast
 import nve_warnings
+import requested_areas
 import retrieve_complete_forecast as rcf
 import web_push
 
@@ -259,21 +260,26 @@ def get_areas() -> dict:
     areas = []
     for area_obj in area.areas.values():
         group, short_name = area_obj.group_and_short_name()
-        areas.append({"id": area_obj.id, "name": short_name, "group": group})
+        areas.append({"id": area_obj.id, "name": short_name, "group": group, "temporary": area_obj.temporary})
 
     areas.sort(key=lambda a: (a["group"] != "Oslo", a["group"], a["name"]))
     return {"default": DEFAULT_AREA.id, "areas": areas}
 
 
-@router.post("/closest-area")
-def closest_area(place: Coordinates) -> dict:
+def _closest_area(latitude: float, longitude: float) -> tuple[area.Area, float]:
     closest, closest_km = None, math.inf
     for area_obj in area.areas.values():
-        north_km = (area_obj.latitude - place.latitude) * 111.2
-        east_km = (area_obj.longtitude - place.longitude) * 111.2 * math.cos(math.radians(place.latitude))
+        north_km = (area_obj.latitude - latitude) * 111.2
+        east_km = (area_obj.longtitude - longitude) * 111.2 * math.cos(math.radians(latitude))
         distance_km = math.hypot(north_km, east_km)
         if distance_km < closest_km:
             closest, closest_km = area_obj, distance_km
+    return closest, closest_km
+
+
+@router.post("/closest-area")
+def closest_area(place: Coordinates) -> dict:
+    closest, closest_km = _closest_area(place.latitude, place.longitude)
     if closest_km > 5:
         return {"area": None}
     return {"area": closest.id, "area_name": closest.display_name, "distance_km": round(closest_km, 1)}
@@ -289,8 +295,21 @@ def request_location(place: Coordinates) -> dict:
     recent_location_requests.append(now)
 
     # rounded to about 1 km for privacy
-    db.save_location_request(round(place.latitude, 2), round(place.longitude, 2))
+    latitude, longitude = round(place.latitude, 2), round(place.longitude, 2)
+    db.save_location_request(latitude, longitude)
     log.info("Location request stored")
+
+    # more than 5 km from every area becomes a temporary area
+    closest, closest_km = _closest_area(latitude, longitude)
+    if closest_km > 5:
+        added = requested_areas.add(latitude, longitude)
+        if added:
+            return {"status": "added", "area": added.id, "area_name": added.display_name}
+    if closest_km <= 5:
+        web_push.send_to_admins(
+            "Closer location requested",
+            f"{latitude}, {longitude}: {closest_km:.1f} km from {closest.display_name}",
+        )
     return {"status": "requested"}
 
 
@@ -316,7 +335,7 @@ def subscribe(subscription: Subscription) -> dict:
         chosen,
     )
     log.info("Stored web push subscription for %s", chosen.display_name)
-    return {"status": "subscribed", "area": chosen.id, "area_name": chosen.display_name}
+    return {"status": "subscribed", "area": chosen.id, "area_name": chosen.display_name, "temporary": chosen.temporary}
 
 
 @router.post("/area")
@@ -325,7 +344,7 @@ def change_area(body: AreaChange) -> dict:
     if not db.update_web_subscription_area(body.endpoint, chosen):
         raise HTTPException(status_code=404, detail="No such subscription.")
     log.info("Web subscription moved to %s", chosen.display_name)
-    return {"status": "updated", "area": chosen.id, "area_name": chosen.display_name}
+    return {"status": "updated", "area": chosen.id, "area_name": chosen.display_name, "temporary": chosen.temporary}
 
 
 @router.post("/rain-alerts")

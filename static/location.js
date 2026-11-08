@@ -2,6 +2,7 @@ const locateButton = document.getElementById('locate-button');
 const locationRequest = document.getElementById('location-request');
 const locationRequestButton = document.getElementById('location-request-button');
 const locationRequestClose = document.getElementById('location-request-close');
+const locationRequestText = document.getElementById('location-request-text');
 
 // rounded to about 1km
 let requestedPlace = null;
@@ -24,20 +25,26 @@ function locateMe() {
       const { area, area_name: areaName, distance_km: distanceKm } = await res.json();
       if (area === null) {
         els.areaNote.textContent = '';
-        locationRequestButton.disabled = false;
-        locationRequestButton.textContent = 'Send request';
-        locationRequest.hidden = false;
+        showLocationRequest("Your location isn't supported yet - would you like to request for it to be added?");
         return;
       }
       els.areaSelect.value = area;
       await changeArea(area);
       els.areaNote.textContent = `Closest: ${areaName}, ${distanceKm} km away. ${els.areaNote.textContent}`;
+      if (distanceKm >= 3) showLocationRequest('Want a more accurate location? Send a request.');
     } catch (err) {
       els.areaNote.textContent = `Could not find the closest location: ${err.message}`;
     }
   }, () => {
     els.areaNote.textContent = 'Could not get your location. Check that location access is allowed.';
   });
+}
+
+function showLocationRequest(text) {
+  locationRequestText.textContent = text;
+  locationRequestButton.disabled = false;
+  locationRequestButton.textContent = 'Send request';
+  locationRequest.hidden = false;
 }
 
 async function sendLocationRequest() {
@@ -50,6 +57,16 @@ async function sendLocationRequest() {
     });
     if (res.status === 429) throw new Error('too many requests - try again later');
     if (!res.ok) throw new Error(`server responded with ${res.status}`);
+    const { status, area, area_name: areaName } = await res.json();
+    if (status === 'added') {
+      locationRequest.hidden = true;
+      rememberArea(area);
+      await setUpAreas();
+      await changeArea(area);
+      els.areaNote.textContent = `${areaName} added, with main forecast for now. `
+        + "Turn on notifications and we'll send you one when it's fully supported.";
+      return;
+    }
     locationRequestButton.textContent = 'Request sent, thank you!';
   } catch (err) {
     locationRequestButton.disabled = false;

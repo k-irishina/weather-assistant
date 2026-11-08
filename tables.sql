@@ -5,7 +5,8 @@ CREATE TABLE forecast_complete(
              forecast_created_at timestamptz,
              forecast_time timestamptz,
              area integer,
-             forecast_data jsonb);
+             forecast_data jsonb,
+             UNIQUE (area, forecast_created_at, forecast_time));
 
 CREATE TABLE app_profiles(
              user_id bigint PRIMARY KEY,
@@ -73,10 +74,19 @@ CREATE TABLE rain_alert_log(
 CREATE INDEX idx_rain_alert_log_area_sent ON rain_alert_log(area, sent_at DESC);
 
 
+CREATE SEQUENCE requested_area_ids START 1001;
+
 CREATE TABLE location_requests(
              latitude numeric(5, 2) NOT NULL,
              longitude numeric(5, 2) NOT NULL,
              requests integer NOT NULL DEFAULT 1,
              first_requested_at timestamptz NOT NULL DEFAULT now(),
              last_requested_at timestamptz NOT NULL DEFAULT now(),
+             -- set when the request became a temporary, forecast-only area
+             area_id integer UNIQUE,
+             display_name text,
+             municipality text,
+             county integer,
+             county_name text,
+             area_added_at timestamptz,
              PRIMARY KEY (latitude, longitude));

@@ -44,7 +44,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def select_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = []
-    sorted_areas = sorted(area.areas.values(), key=lambda x: x.display_name, reverse=False)
+    permanent_areas = [area_obj for area_obj in area.areas.values() if not area_obj.temporary]
+    sorted_areas = sorted(permanent_areas, key=lambda x: x.display_name, reverse=False)
     for area_obj in sorted_areas:
         keyboard.append([InlineKeyboardButton(area_obj.display_name, callback_data=area_obj.id)])
     await update.message.reply_text(

@@ -17,13 +17,15 @@ class Region:
         return self.now().date()
 
 class Area:
-    def __init__(self, latitude, longtitude, id, display_name, region: Region, municipality: str = ""):
+    def __init__(self, latitude, longtitude, id, display_name, region: Region, municipality: str = "",
+                 temporary: bool = False):
         self.latitude = latitude
         self.longtitude = longtitude
         self.id = id
         self.display_name = display_name
         self.region = region
         self.municipality = municipality
+        self.temporary = temporary
 
     def group_and_short_name(self) -> tuple[str, str]:
         group, dash, short_name = self.display_name.partition(" - ")

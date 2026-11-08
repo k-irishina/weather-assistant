@@ -57,6 +57,7 @@ def insert_forecast_rows(created_at, area: area.Area, rows) -> int:
                 """
                 INSERT INTO forecast_complete(forecast_created_at, forecast_time, area, forecast_data)
                 VALUES(%s, %s, %s, %s)
+                ON CONFLICT (area, forecast_created_at, forecast_time) DO NOTHING
                 """,
                 values,
             )
@@ -890,4 +891,86 @@ def save_location_request(latitude: float, longitude: float) -> None:
                 """,
                 (latitude, longitude),
             )
+            conn.commit()
+
+
+def admin_web_subscriptions() -> list[WebSubscription]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT endpoint, p256dh, auth, is_admin
+                FROM web_subscriptions
+                WHERE is_admin
+                """
+            )
+            return [WebSubscription(*row) for row in cur.fetchall()]
+
+
+class RequestedArea(NamedTuple):
+    area_id: int
+    latitude: float
+    longitude: float
+    display_name: str
+    municipality: str
+    county: int
+    county_name: str
+
+
+def requested_areas() -> list[RequestedArea]:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT area_id, latitude, longitude, display_name, municipality, county, county_name
+                FROM location_requests
+                WHERE area_id IS NOT NULL
+                ORDER BY area_id
+                """
+            )
+            return [
+                RequestedArea(area_id, float(latitude), float(longitude), name, municipality, county, county_name)
+                for area_id, latitude, longitude, name, municipality, county, county_name in cur.fetchall()
+            ]
+
+
+def requested_areas_added_since(since: datetime) -> int:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM location_requests WHERE area_added_at >= %s", (since,))
+            return cur.fetchone()[0]
+
+
+def add_requested_area(
+    latitude: float, longitude: float, display_name: str, municipality: str, county: int, county_name: str
+) -> RequestedArea:
+    # turns the stored request at this point into a temporary area
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE location_requests
+                SET area_id = nextval('requested_area_ids'),
+                    display_name = %(display_name)s,
+                    municipality = %(municipality)s,
+                    county = %(county)s,
+                    county_name = %(county_name)s,
+                    area_added_at = now()
+                WHERE latitude = %(latitude)s AND longitude = %(longitude)s
+                RETURNING area_id
+                """,
+                {
+                    "latitude": latitude, "longitude": longitude, "display_name": display_name,
+                    "municipality": municipality, "county": county, "county_name": county_name,
+                },
+            )
+            area_id = cur.fetchone()[0]
+            conn.commit()
+            return RequestedArea(area_id, latitude, longitude, display_name, municipality, county, county_name)
+
+
+def delete_requested_area(area_id: int) -> None:
+    with connpool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM location_requests WHERE area_id = %s", (area_id,))
             conn.commit()

@@ -19,6 +19,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 import jobs
+import requested_areas
 import tg_bot
 import web_api
 
@@ -34,6 +35,10 @@ class RevalidatingStaticFiles(StaticFiles):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        requested_areas.load_and_promote()
+    except Exception:
+        log.exception("Could not load the requested areas")
     application = tg_bot.build_application()
     await application.initialize()
     await application.updater.start_polling(**tg_bot.POLLING_KWARGS)

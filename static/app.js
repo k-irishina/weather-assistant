@@ -143,8 +143,10 @@ async function changeArea(areaId) {
       body: JSON.stringify({ endpoint: subscription.endpoint, area: areaId }),
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
-    const { area_name: areaName } = await res.json();
-    els.areaNote.textContent = `Notifications now follow ${areaName}.`;
+    const { area_name: areaName, temporary } = await res.json();
+    els.areaNote.textContent = temporary
+      ? `Notifications now follow ${areaName}. We'll send you one when it's fully supported.`
+      : `Notifications now follow ${areaName}.`;
   } catch (err) {
     els.areaNote.textContent = `Could not move your notifications: ${err.message}`;
   }
@@ -851,6 +853,8 @@ async function subscribe() {
       body: JSON.stringify({ ...subscription.toJSON(), area: selectedArea }),
     });
     if (!res.ok) throw new Error(`server said ${res.status}`);
+    const { area_name: areaName, temporary } = await res.json();
+    if (temporary) els.areaNote.textContent = `We'll send you a notification when ${areaName} is fully supported.`;
 
     showSubscribed();
   } catch (err) {
