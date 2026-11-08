@@ -370,7 +370,9 @@ Forecast for {day_text}, {report["area_name"]}:
 """
 
 
-def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list["WeatherCondition"]:
+def conditions(
+    report: ForecastReport, min_moderate_run_hours: int = 1, min_moderate_total_hours: int = 1
+) -> list["WeatherCondition"]:
     sunset = report["sunrise_sunset"]["sunset_time"].replace(tzinfo=None)
     today_after_sunset = report["from_hour"] is not None and report["local_now"].time() >= sunset
     items = [] if today_after_sunset else sunny_conditions(report["sunny_times"], report["from_hour"])
@@ -379,7 +381,8 @@ def conditions(report: ForecastReport, min_moderate_wind_hours: int = 1) -> list
         report["precipitation_window"], report["precipitation_window_hours"],
         report["precipitation"], report["precipitation_amounts"], report["from_hour"],
     )
-    items += wind_conditions(report["wind_by_hour"], min_moderate_wind_hours, report["from_hour"])
+    items += wind_conditions(
+        report["wind_by_hour"], min_moderate_run_hours, min_moderate_total_hours, report["from_hour"])
     uv_index = report["uv_index"]
     if uv_index is not None and float(uv_index) >= constants.min_shown_uv_index:
         items.append(WeatherCondition(
@@ -495,8 +498,45 @@ def from_hour_onwards(by_hour: dict, cutoff: Optional[time]) -> dict:
     return {hour: value for hour, value in by_hour.items() if hour >= cutoff}
 
 
+def wind_arrow(hours, wind_by_hour: dict) -> str:
+    east, north, total_speed = 0.0, 0.0, 0.0
+    for hour in hours:
+        reading = wind_by_hour.get(hour)
+        if reading is None or reading.speed is None or reading.direction is None:
+            continue
+        speed = float(reading.speed)
+        angle = math.radians(float(reading.direction))
+        east += speed * math.sin(angle)
+        north += speed * math.cos(angle)
+        total_speed += speed
+
+    # if too variable, show nothing
+    if total_speed == 0 or math.hypot(east, north) < total_speed / 2:
+        return ""
+    from_degrees = math.degrees(math.atan2(east, north)) % 360
+    return ("⬇️", "↙️", "⬅️", "↖️", "⬆️", "↗️", "➡️", "↘️")[round(from_degrees / 45) % 8]
+
+
+def wind_hours_with_arrows(hours, windy_hours: frozenset, wind_by_hour: dict, current_hour: Optional[time]) -> str:
+    compass_by_arrow = {"⬇️": {"N"}, "↙️": {"N", "E"}, "⬅️": {"E"}, "↖️": {"S", "E"},
+                        "⬆️": {"S"}, "↗️": {"S", "W"}, "➡️": {"W"}, "↘️": {"N", "W"}}
+    texts = []
+    for interval in split_into_intervals(hours):
+        stretches = split_into_intervals([hour for hour in interval if hour in windy_hours])
+        arrows = [wind_arrow(stretch, wind_by_hour) for stretch in stretches]
+        shared = set.intersection(*(compass_by_arrow[arrow] for arrow in arrows)) if arrows and all(arrows) else set()
+        shared_arrow = next((arrow for arrow, compass in compass_by_arrow.items() if compass == shared), "")
+        no_direction_anywhere = not any(arrows)
+        pieces = [(shared_arrow, interval)] if shared_arrow or no_direction_anywhere else list(zip(arrows, stretches))
+        for arrow, piece in pieces:
+            times = format_hours(piece, current_hour)
+            texts.append(f"{arrow} {times}" if arrow else times)
+    return ", ".join(texts)
+
+
 def wind_conditions(
-    wind_by_hour: dict, min_moderate_run_hours: int = 1, current_hour: Optional[time] = None
+    wind_by_hour: dict, min_moderate_run_hours: int = 1, min_moderate_total_hours: int = 1,
+    current_hour: Optional[time] = None,
 ) -> list["WeatherCondition"]:
     strong, moderate = [], []
     for hour, reading in sorted(wind_by_hour.items()):
@@ -514,13 +554,15 @@ def wind_conditions(
     if strong:
         strong = bridge_gaps(strong, constants.max_bridge_gap_hours, blocked=moderate_set)
         items.append(WeatherCondition(kind="wind", emoji="\U0001f32c\ufe0f",
-                               text=f"Strong wind {format_hours(strong, current_hour)}."))
+                               text=f"Strong wind {wind_hours_with_arrows(strong, strong_set, wind_by_hour, current_hour)}."))
 
-    moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
-    moderate = significant_moderate_wind_hours(moderate, min_moderate_run_hours)
-    if moderate:
+    has_long_enough_run = any(len(run) >= min_moderate_run_hours for run in split_into_intervals(moderate))
+    enough_hrs_total = len(moderate) >= min_moderate_total_hours
+    after_early_morning = any(hour >= constants.moderate_wind_mentioned_from for hour in moderate)
+    if has_long_enough_run and enough_hrs_total and after_early_morning:
+        moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
         items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
-                               text=f"Moderate wind {format_hours(moderate, current_hour)}."))
+                               text=f"Moderate wind {wind_hours_with_arrows(moderate, moderate_set, wind_by_hour, current_hour)}."))
     return items
 
 
@@ -538,15 +580,6 @@ def split_into_intervals(hours) -> list:
         else:
             intervals.append([hour])
     return intervals
-
-
-def significant_moderate_wind_hours(hours, min_interval_hours: int) -> list:
-    significant = [
-        hour for interval in split_into_intervals(hours) if len(interval) >= min_interval_hours for hour in interval
-    ]
-    if not any(hour >= constants.moderate_wind_mentioned_from for hour in significant):
-        return []
-    return significant
 
 
 def bridge_gaps(hours, max_gap_hours: int, blocked=frozenset()) -> list:
@@ -836,7 +869,7 @@ def precipitation_type(avg_temps: dict[str, dict[str, float]]) -> Precipitation:
         return {"name": "precipitation", "emoji_active": "🌧️", "emoji_inactive": "🌂"}
     if mean(avg_temp) > 1:
         return {"name": "rain", "emoji_active": "🌧️", "emoji_inactive": "🌂"}
-    return {"name": "snow", "emoji_active": "☃️", "emoji_inactive": ""}
+    return {"name": "snow", "emoji_active": "☃️", "emoji_inactive": "⛸️"}
 
 
 def group_by_time(data):

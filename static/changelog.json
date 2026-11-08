@@ -1,6 +1,10 @@
 [
   {
     "date": "2026-11-08",
+    "text": "Wind direction for windy hours. Title colour reflecting conditions"
+  },
+  {
+    "date": "2026-11-08",
     "text": "Added Sandnes and Madla. Requested locations are now added automatically, and once fully promoted, you get all notifications and features for them."
   },
   {

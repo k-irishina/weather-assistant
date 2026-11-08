@@ -181,7 +181,9 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     uv_index = report["uv_index"]
     greeting = assistant.get_greeting(report["local_now"].hour)
     conditions = assistant.conditions(
-        report, min_moderate_wind_hours=constants.min_significant_moderate_wind_run_hours
+        report,
+        min_moderate_run_hours=constants.min_significant_moderate_wind_run_hours,
+        min_moderate_total_hours=constants.min_significant_moderate_wind_total_hours,
     )
     for condition in conditions:
         for line in condition.details:

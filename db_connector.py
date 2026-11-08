@@ -40,6 +40,7 @@ class WindReading(NamedTuple):
     gust: Optional[float]
     percentile_10: Optional[float]
     percentile_90: Optional[float]
+    direction: Optional[float] = None
 
 
 class ForecastFetch(NamedTuple):
@@ -270,7 +271,8 @@ def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:
                            forecast_data->>'wind_speed' AS wind_speed,
                            forecast_data->>'wind_speed_of_gust' AS gust,
                            forecast_data->>'wind_speed_percentile_10' AS p10,
-                           forecast_data->>'wind_speed_percentile_90' AS p90
+                           forecast_data->>'wind_speed_percentile_90' AS p90,
+                           forecast_data->>'wind_from_direction' AS direction
                     FROM forecast_complete
                     WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
                       AND area = %(area)s
@@ -283,7 +285,7 @@ def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:
                       )
                 )
                 SELECT (forecast_time AT TIME ZONE %(tz)s)::time,
-                       wind_speed::numeric, gust::numeric, p10::numeric, p90::numeric
+                       wind_speed::numeric, gust::numeric, p10::numeric, p90::numeric, direction::numeric
                 FROM latest_data
                 ORDER BY forecast_time;
             """
@@ -297,8 +299,8 @@ def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:
                 },
             )
             return {
-                hour: WindReading(speed=speed, gust=gust, percentile_10=p10, percentile_90=p90)
-                for hour, speed, gust, p10, p90 in cursor.fetchall()
+                hour: WindReading(speed=speed, gust=gust, percentile_10=p10, percentile_90=p90, direction=direction)
+                for hour, speed, gust, p10, p90, direction in cursor.fetchall()
             }
 
 

@@ -26,7 +26,8 @@ possible_hour_probability = min_precipitation_probability / 2
 moderate_wind_speed = 5.0
 strong_wind_speed = 8.0
 
-min_significant_moderate_wind_run_hours = 4
+min_significant_moderate_wind_run_hours = 2
+min_significant_moderate_wind_total_hours = 3
 # moderate wind only before 5AM isn't important
 moderate_wind_mentioned_from = time(5)
 
