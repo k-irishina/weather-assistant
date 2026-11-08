@@ -1,5 +1,9 @@
 [
   {
+    "date": "2026-11-08",
+    "text": "Requested locations are now added automatically, once fully promoted, you get all notifications and features on them."
+  },
+  {
     "date": "2026-11-04",
     "text": "Improved resilience of MET outages. Night tile shows up if forecast is checked late."
   },
