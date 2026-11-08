@@ -158,6 +158,24 @@ body.photo-mode .header-buttons {
   right: .5rem;
 }
 
+body.photo-mode h2 {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+}
+
+body.photo-mode .icon-button,
+body.photo-mode select {
+  background-color: color-mix(in srgb, var(--card) 65%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-color: rgb(255 255 255 / 55%);
+}
+
+body.photo-mode .switch:checked {
+  background-color: color-mix(in srgb, var(--ink) 90%, transparent);
+}
+
 main {
   max-width: 34rem;
   margin: 0 auto;
@@ -984,4 +1002,30 @@ div.period-tile .period-tile-value {
   padding: .35rem 0;
   border-radius: .5rem;
   background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+body:not(.glitter-mode) h1[data-sky-colours] {
+  width: fit-content;
+  background-image: linear-gradient(90deg, var(--sky-from), var(--sky-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+h1[data-sky-colours="night"] { --sky-from: #1c2d73; --sky-to: #553891; }
+h1[data-sky-colours="sunrise"] { --sky-from: #3d75c9; --sky-to: #c15694; }
+h1[data-sky-colours="sunset"] { --sky-from: #aa4b10; --sky-to: #aa1622; }
+h1[data-sky-colours="snow"] { --sky-from: #396a8b; --sky-to: #194b66; }
+h1[data-sky-colours="rain"] { --sky-from: #24589a; --sky-to: #33689f; }
+h1[data-sky-colours="sunny"] { --sky-from: #8f4a00; --sky-to: #ac6b03; }
+h1[data-sky-colours="cloudy"] { --sky-from: #45566e; --sky-to: #6a7e99; }
+
+@media (prefers-color-scheme: dark) {
+  h1[data-sky-colours="night"] { --sky-from: #9aa8ff; --sky-to: #b08bfb; }
+  h1[data-sky-colours="sunrise"] { --sky-from: #8fb0ff; --sky-to: #ff8f95; }
+  h1[data-sky-colours="sunset"] { --sky-from: #ff8f66; --sky-to: #f46565; }
+  h1[data-sky-colours="snow"] { --sky-from: #a9d4ea; --sky-to: #cfe7f3; }
+  h1[data-sky-colours="rain"] { --sky-from: #8bb8f0; --sky-to: #b0d0f7; }
+  h1[data-sky-colours="sunny"] { --sky-from: #f69356; --sky-to: #ffdc7a; }
+  h1[data-sky-colours="cloudy"] { --sky-from: #8ea2bf; --sky-to: #d0dae6; }
 }

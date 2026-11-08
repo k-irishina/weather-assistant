@@ -43,6 +43,7 @@ OSLO_KOMMUNE = "0301"
 LILLESTROM = "3205"
 BAERUM = "3201"
 STAVANGER = "1103"
+SANDNES = "1108"
 
 areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO, OSLO_KOMMUNE), 
           2: Area(59.9549, 11.0622, 2, 'Lillestrøm', AKERSHUS, LILLESTROM),
@@ -59,6 +60,8 @@ areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO, OSLO_KOMMUNE),
           13: Area(59.950569, 10.644542, 13, 'Oslo - Røa', OSLO, OSLO_KOMMUNE),
           14: Area(59.930, 10.865, 14, 'Oslo - Alna', OSLO, OSLO_KOMMUNE),
           15: Area(59.842, 10.812, 15, 'Oslo - Søndre Nordstrand', OSLO, OSLO_KOMMUNE),
-          16: Area(59.963, 10.668, 16, 'Oslo - Holmenkollen', OSLO, OSLO_KOMMUNE)
+          16: Area(59.963, 10.668, 16, 'Oslo - Holmenkollen', OSLO, OSLO_KOMMUNE),
+          17: Area(58.8517, 5.7369, 17, 'Sandnes', ROGALAND, SANDNES),
+          18: Area(58.948, 5.645, 18, 'Madla', ROGALAND, STAVANGER)
         }
 

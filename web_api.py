@@ -196,6 +196,13 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
             else report["forecast_checked_at"].astimezone(report["local_now"].tzinfo).strftime("%H:%M")
         ),
         "greeting": greeting,
+        "sky_colours": (
+            None if report["right_now"] is None
+            else assistant.sky_colours_for_title(
+                report["local_now"], report["sunrise_sunset"]["sunrise_time"],
+                report["sunrise_sunset"]["sunset_time"], report["right_now"]["symbol_code"],
+            )
+        ),
         "temperatures": temperatures,
         # None when the forecast table has no rows for the day yet
         "uv_index": None if uv_index is None else round(_number(uv_index)),

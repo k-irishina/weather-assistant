@@ -12,6 +12,7 @@ import area
 import db_connector
 import near_term_forecast
 import retrieve_complete_forecast as rcf
+from background_photo_picker import day_part
 
 
 class Precipitation(TypedDict):
@@ -104,6 +105,32 @@ def period_symbol(symbols: dict[time, str], hours, tie_hour: int, daylight: int)
         return base + "_day"
     dark = [suffix for suffix in suffixes if suffix != "_day"]
     return base + (Counter(dark).most_common(1)[0][0] if dark else "_night")
+
+
+def sky_colours_for_title(local_now: datetime, sunrise: time, sunset: time, symbol_code: Optional[str]) -> str:
+    base = split_symbol(symbol_code)[0] if symbol_code else ""
+    clear = base in ("clearsky", "fair")
+    snow = "snow" in base or "sleet" in base
+    rain = "rain" in base and not snow
+    part = day_part(local_now.time(), sunrise, sunset)
+
+    minutes_now = local_now.hour * 60 + local_now.minute
+    sunrise_minutes = sunrise.hour * 60 + sunrise.minute
+    around_sunrise = sunrise_minutes - 30 <= minutes_now < sunrise_minutes + 45
+
+    if part == "night":
+        return "night"
+    if part != "night" and around_sunrise and clear:
+        return "sunrise"
+    if part == "sunset" and clear:
+        return "sunset"
+    if part != "night" and snow:
+        return "snow"
+    if part != "night" and rain:
+        return "rain"
+    if part not in ("night", "sunset") and clear and not around_sunrise:
+        return "sunny"
+    return "cloudy"
 
 
 def fallback_for_missing_period_data(

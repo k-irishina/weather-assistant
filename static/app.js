@@ -41,6 +41,13 @@ const els = {
 
 let registration = null;
 let selectedArea = null;
+let showSkyColours = false;
+let latestSkyColours = null;
+
+function applySkyColours() {
+  if (!showSkyColours || latestSkyColours === null) return;
+  document.querySelector('h1').dataset.skyColours = latestSkyColours;
+}
 
 // if not subscribed, enables us to keep users location in browser
 const AREA_KEY = 'weather-assistant-area';
@@ -300,6 +307,10 @@ async function loadForecast(day = 'today') {
     const res = await fetch(query ? `/api/forecast?${query}` : '/api/forecast');
     if (!res.ok) throw new Error(`server said ${res.status}`);
     const data = await res.json();
+    if (data.sky_colours !== null && data.sky_colours !== undefined) {
+      latestSkyColours = data.sky_colours;
+      applySkyColours();
+    }
     forecastDay = day;
 
     const sunrise = document.createElement('span');
@@ -722,6 +733,8 @@ async function showSubscriptionOptions() {
     updatePushSummary();
 
     if (!isAdmin) return;
+    showSkyColours = true;
+    applySkyColours();
     els.testButton.hidden = false;
     els.testButton.disabled = false;
     els.testButton.textContent = 'Send a test notification';
