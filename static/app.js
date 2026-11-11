@@ -6,6 +6,7 @@ const els = {
   warnings: document.getElementById('warnings'),
   rain: document.getElementById('rain'),
   rainUpdated: document.getElementById('rain-updated'),
+  rainTitle: document.getElementById('rain-title'),
   rainInfoToggle: document.getElementById('rain-info-toggle'),
   rainInfo: document.getElementById('rain-info'),
   rainLegend: document.getElementById('rain-legend'),
@@ -248,7 +249,16 @@ function conditionList(items) {
     mark.textContent = item.emoji;
 
     const text = document.createElement('span');
-    text.textContent = item.text;
+    for (const part of item.text.split(/([↓↙←↖↑↗→↘])/)) {
+      if (part && '↓↙←↖↑↗→↘'.includes(part)) {
+        const arrow = document.createElement('span');
+        arrow.className = 'wind-arrow';
+        arrow.textContent = part;
+        text.append(arrow);
+      } else {
+        text.append(part);
+      }
+    }
 
     if (item.details.length) {
       const details = document.createElement('details');
@@ -439,6 +449,7 @@ async function loadNearTermForecast() {
       els.rain.hidden = true;
       return;
     }
+    els.rainTitle.textContent = `Two-hour ${data.kind}`;
     renderRainStrip(data);
     els.rain.hidden = false;
   } catch (err) {

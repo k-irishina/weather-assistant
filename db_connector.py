@@ -304,7 +304,7 @@ def evaluate_wind(area: area.Area, date: date) -> dict[time, WindReading]:
             }
 
 
-def hourly_temperatures(area: area.Area, date: date) -> dict[time, float]:
+def hourly_temperatures(area: area.Area, date: date, field: str = "air_temperature") -> dict[time, float]:
     timezone = str(area.region.timezone)
     day_start, day_end = local_day_bounds(area, date)
     with connpool.connection() as conn:
@@ -312,7 +312,7 @@ def hourly_temperatures(area: area.Area, date: date) -> dict[time, float]:
             cursor.execute(
                 """
                 SELECT (forecast_time AT TIME ZONE %(tz)s)::time,
-                       (forecast_data->>'air_temperature')::numeric
+                       (forecast_data->>%(field)s)::numeric
                 FROM forecast_complete
                 WHERE forecast_time >= %(day_start)s AND forecast_time < %(day_end)s
                   AND area = %(area)s
@@ -323,10 +323,10 @@ def hourly_temperatures(area: area.Area, date: date) -> dict[time, float]:
                         AND area = %(area)s
                       GROUP BY forecast_time
                   )
-                  AND forecast_data->>'air_temperature' IS NOT NULL
+                  AND forecast_data->>%(field)s IS NOT NULL
                 ORDER BY forecast_time
                 """,
-                {"tz": timezone, "day_start": day_start, "day_end": day_end, "area": area.id},
+                {"tz": timezone, "day_start": day_start, "day_end": day_end, "area": area.id, "field": field},
             )
             return dict(cursor.fetchall())
 

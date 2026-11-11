@@ -246,7 +246,7 @@ def get_near_term_forecast(area: Optional[int] = None) -> dict:
     series = near_term_forecast.latest_series(chosen)
     if series is not None:
         series = near_term_forecast.without_past_steps(series, datetime.now(timezone.utc))
-    return near_term_forecast.page_payload(series, chosen)
+    return near_term_forecast.page_payload(series, chosen, assistant.precipitation_kind_next_hours(chosen))
 
 
 @router.get("/background")

@@ -9,6 +9,7 @@ from telegram import Bot
 import analysis_constants as constants
 import app_config
 import area
+import assistant
 import db_connector as db
 import near_term_forecast
 import scheduler
@@ -143,21 +144,21 @@ def duration_text(minutes: int) -> str:
     return f"{hours}h {rest}min" if rest else f"{hours}h"
 
 
-def alert_text(alert: RainAlert, area_obj: area.Area) -> tuple[str, str]:
+def alert_text(alert: RainAlert, area_obj: area.Area, kind: str = "rain") -> tuple[str, str]:
     timezone = area_obj.region.timezone
     when = near_term_forecast.local_hhmm(alert.starts_at, timezone)
     if alert.kind == HEAVY:
-        title = "Heavy rain incoming"
+        title = f"Heavy {kind} incoming"
         heavy_when = near_term_forecast.local_hhmm(alert.heavy_from, timezone)
         if heavy_when == when:
             body = (f"{alert.peak_rate:g} mm/h from about {when} in "
                     f"{area_obj.display_name}, for around {duration_text(alert.minutes)}.")
         else:
-            body = (f"Rain from about {when} in {area_obj.display_name}, heavy from about "
+            body = (f"{kind.capitalize()} from about {when} in {area_obj.display_name}, heavy from about "
                     f"{heavy_when} (up to {alert.peak_rate:g} mm/h), for around {duration_text(alert.minutes)}.")
     else:
-        title = "Rain the forecast missed"
-        body = (f"Rain from about {when} in "
+        title = f"{kind.capitalize()} the forecast missed"
+        body = (f"{kind.capitalize()} from about {when} in "
                 f"{area_obj.display_name} ({alert.peak_rate:g} mm/h, around "
                 f"{duration_text(alert.minutes)}). This morning's forecast did not "
                 "call for it.")
@@ -192,7 +193,7 @@ def check_area_for_rain(area_obj: area.Area) -> Optional[RainAlert]:
         log.info("Rain alert for %s suppressed, same rain as the last alert", area_obj.display_name)
         return None
 
-    title, body = alert_text(alert, area_obj)
+    title, body = alert_text(alert, area_obj, assistant.precipitation_kind_next_hours(area_obj))
     recipients = web_push.send_to_rain_subscribers(area_obj, title, body)
     db.log_rain_alert(area_obj, alert.kind, alert.starts_at,
                       alert.starts_at + timedelta(minutes=alert.minutes), alert.peak_rate, recipients)
@@ -200,7 +201,7 @@ def check_area_for_rain(area_obj: area.Area) -> Optional[RainAlert]:
 
 
 async def notify_telegram_subscribers(area_obj: area.Area, alert: RainAlert, bot: Bot) -> None:
-    _, body = alert_text(alert, area_obj)
+    _, body = alert_text(alert, area_obj, assistant.precipitation_kind_next_hours(area_obj))
     for user_id in db.dynamic_update_users():
         if user_id not in TEST_USERS:
             continue

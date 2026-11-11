@@ -1,5 +1,9 @@
 [
   {
+    "date": "2026-11-11",
+    "text": "Short alert color description in morning push. Added sleet ('wet snow') type for accuracy of precipitation type. Some fixes for snowy season."
+  },
+  {
     "date": "2026-11-08",
     "text": "Wind direction for windy hours. Title colour reflecting conditions"
   },

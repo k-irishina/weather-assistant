@@ -153,6 +153,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     sunrise_sunset = rcf.fetch_sunset_sunrise_for_area(area_obj)
     symbols = db_connector.hourly_symbols(area_obj, forecast_day)
     hourly_temperatures = db_connector.hourly_temperatures(area_obj, forecast_day)
+    hourly_dew_points = db_connector.hourly_temperatures(area_obj, forecast_day, "dew_point_temperature")
     period_ends = {key: until.hour for _, key, until in temperature_periods}
     for key, (hours, tie_hour) in constants.forecast_period_hours.items():
         if avg_temperatures[key]["avg_temperature"] is None:
@@ -190,6 +191,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
     window_pct_by_hour = from_hour_onwards(window_pct_by_hour, from_hour)
     wind_by_hour = from_hour_onwards(wind_by_hour, from_hour)
     hourly_temperatures = from_hour_onwards(hourly_temperatures, from_hour)
+    hourly_dew_points = from_hour_onwards(hourly_dew_points, from_hour)
 
     outlook = classify_precipitation(precipitation_pct_by_hour, window_pct_by_hour)
     right_now = None
@@ -233,7 +235,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
         forecast_checked_at=forecast_checked_at,
         sunrise_sunset=sunrise_sunset,
         sunny_times=sunny_times,
-        precipitation=precipitation_type(avg_temperatures),
+        precipitation=precipitation_type(hourly_temperatures, hourly_dew_points, precipitation_pct_by_hour),
         precipitation_high=outlook.high,
         precipitation_possible=outlook.possible,
         precipitation_window=outlook.window_probability,
@@ -266,7 +268,8 @@ def right_now_reading(area_obj: area.Area, hour: time, hourly_temperatures: dict
         series = near_term_forecast.latest_series(area_obj)
         if series is not None and near_term_forecast.is_fresh(series, now):
             series = near_term_forecast.without_past_steps(series, now)
-            rain_text = near_term_forecast.compose_near_rain_text(series, area_obj.region.timezone)
+            rain_text = near_term_forecast.compose_near_rain_text(
+                series, area_obj.region.timezone, precipitation_kind_next_hours(area_obj))
             if rain_text:
                 right_now["rain"] = rain_text[0].lower() + rain_text[1:]
     return right_now
@@ -404,13 +407,17 @@ def format_forecast_text_short(report: ForecastReport, alerts=()) -> str:
         for _, key, _ in temperature_periods
     )
 
-    rain_alert = next((alert for alert in alerts if alert.kind == "rain"), None)
-    wind_alert = next((alert for alert in alerts if alert.kind == "wind"), None)
-    rain_part = f"⚠️ {rain_alert.name}" if rain_alert else compact_precipitation_text(report)
-    lines = [f"{temp_part} {rain_part}"]
-    # other warnings (ice, snow, flood etc) get their own line
-    for name in dict.fromkeys(alert.name for alert in alerts if alert.kind not in ("rain", "wind")):
-        lines.append(f"⚠️ {name}")
+    colour_emoji = {"red": "🔴", "orange": "🟠", "yellow": "🟡"}
+    important_alerts = list(dict.fromkeys(
+        f"{colour_emoji[alert.color]} {alert.name.lower()} alert"
+        for alert in sorted(alerts, key=lambda alert: alert.color != "red")
+        if alert.color in ("red", "orange")
+    ))
+    yellow = list(dict.fromkeys(f"🟡 {alert.name.lower()} alert" for alert in alerts if alert.color == "yellow"))
+
+    lines = [" ".join([temp_part, compact_precipitation_text(report), *important_alerts])]
+    if yellow:
+        lines.append(" ".join(yellow))
 
     if report["sunny_times"]:
         sunny_hours = bridge_gaps(sorted(report["sunny_times"]), constants.max_bridge_gap_hours)
@@ -421,9 +428,7 @@ def format_forecast_text_short(report: ForecastReport, alerts=()) -> str:
         if constants.wind_strength(reading.speed, reading.gust, reading.percentile_90)
         in (constants.MODERATE, constants.STRONG)
     })
-    if wind_alert:
-        lines.append(f"⚠️ {wind_alert.name}")
-    elif windy_hours:
+    if windy_hours:
         windy_hours = bridge_gaps(windy_hours, constants.max_bridge_gap_hours)
         lines.append(f"💨 {format_hours(windy_hours)}")
 
@@ -514,12 +519,12 @@ def wind_arrow(hours, wind_by_hour: dict) -> str:
     if total_speed == 0 or math.hypot(east, north) < total_speed / 2:
         return ""
     from_degrees = math.degrees(math.atan2(east, north)) % 360
-    return ("⬇️", "↙️", "⬅️", "↖️", "⬆️", "↗️", "➡️", "↘️")[round(from_degrees / 45) % 8]
+    return ("↓", "↙", "←", "↖", "↑", "↗", "→", "↘")[round(from_degrees / 45) % 8]
 
 
 def wind_hours_with_arrows(hours, windy_hours: frozenset, wind_by_hour: dict, current_hour: Optional[time]) -> str:
-    compass_by_arrow = {"⬇️": {"N"}, "↙️": {"N", "E"}, "⬅️": {"E"}, "↖️": {"S", "E"},
-                        "⬆️": {"S"}, "↗️": {"S", "W"}, "➡️": {"W"}, "↘️": {"N", "W"}}
+    compass_by_arrow = {"↓": {"N"}, "↙": {"N", "E"}, "←": {"E"}, "↖": {"S", "E"},
+                        "↑": {"S"}, "↗": {"S", "W"}, "→": {"W"}, "↘": {"N", "W"}}
     texts = []
     for interval in split_into_intervals(hours):
         stretches = split_into_intervals([hour for hour in interval if hour in windy_hours])
@@ -556,13 +561,14 @@ def wind_conditions(
         items.append(WeatherCondition(kind="wind", emoji="\U0001f32c\ufe0f",
                                text=f"Strong wind {wind_hours_with_arrows(strong, strong_set, wind_by_hour, current_hour)}."))
 
+    moderate = [hour for hour in moderate if hour >= constants.moderate_wind_mentioned_from]
+    bridged_moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
+    shown_moderate = [hour for interval in split_into_intervals(bridged_moderate) if len(interval) >= 2 for hour in interval]
     has_long_enough_run = any(len(run) >= min_moderate_run_hours for run in split_into_intervals(moderate))
     enough_hrs_total = len(moderate) >= min_moderate_total_hours
-    after_early_morning = any(hour >= constants.moderate_wind_mentioned_from for hour in moderate)
-    if has_long_enough_run and enough_hrs_total and after_early_morning:
-        moderate = bridge_gaps(moderate, constants.max_bridge_gap_hours, blocked=strong_set)
+    if shown_moderate and has_long_enough_run and enough_hrs_total:
         items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
-                               text=f"Moderate wind {wind_hours_with_arrows(moderate, moderate_set, wind_by_hour, current_hour)}."))
+                               text=f"Moderate wind {wind_hours_with_arrows(shown_moderate, moderate_set, wind_by_hour, current_hour)}."))
     return items
 
 
@@ -649,7 +655,7 @@ def precipitation_conditions(
         if 0 < amount < constants.moderate_rain_rate:
             light_hours.append(hour)
     # MET's weather icons for the three levels, f.ex "heavysnow"; plain precipitation uses the rain ones
-    icon_name = "snow" if name == "snow" else "rain"
+    icon_name = name if name in ("snow", "sleet") else "rain"
     details = []
     if heavy_hours:
         details.append({"symbol": f"heavy{icon_name}", "label": f"Heavy {name}", "hours": format_hours(heavy_hours, from_hour)})
@@ -859,17 +865,60 @@ def calculate_if_sunny(json_data) -> bool:
         json_data.get('cloud_area_fraction_medium'),
     )
 
-def precipitation_type(avg_temps: dict[str, dict[str, float]]) -> Precipitation:
-    avg_temp = [
-        float(period["avg_temperature"])
-        for period in avg_temps.values()
-        if period.get("avg_temperature") is not None
+def wet_bulb_temperature(temperature: float, dew_point: float) -> float:
+    # humidity from the dew point (Magnus formula) and Stull's 2011 wet-bulb formula
+    humidity = 100 * math.exp(17.625 * dew_point / (243.04 + dew_point)) / math.exp(17.625 * temperature / (243.04 + temperature))
+    return (
+        temperature * math.atan(0.151977 * math.sqrt(humidity + 8.313659))
+        + math.atan(temperature + humidity)
+        - math.atan(humidity - 1.676331)
+        + 0.00391838 * humidity ** 1.5 * math.atan(0.023101 * humidity)
+        - 4.686035
+    )
+
+
+def precipitation_kind(wet_bulb: float) -> str:
+    if wet_bulb < constants.max_snow_wet_bulb:
+        return "snow"
+    if constants.max_snow_wet_bulb <= wet_bulb <= constants.max_sleet_wet_bulb:
+        return "sleet"
+    return "rain"
+
+
+def precipitation_kind_next_hours(area_obj: area.Area) -> str:
+    local_now = area_obj.region.now()
+    today = local_now.date()
+    temperatures = db_connector.hourly_temperatures(area_obj, today)
+    dew_points = db_connector.hourly_temperatures(area_obj, today, "dew_point_temperature")
+    hours = [time(local_now.hour), time((local_now.hour + 1) % 24)]
+    wet_bulbs = [
+        wet_bulb_temperature(float(temperatures[hour]), float(dew_points[hour]))
+        for hour in hours if hour in temperatures and hour in dew_points
     ]
-    if not avg_temp:
-        return {"name": "precipitation", "emoji_active": "🌧️", "emoji_inactive": "🌂"}
-    if mean(avg_temp) > 1:
-        return {"name": "rain", "emoji_active": "🌧️", "emoji_inactive": "🌂"}
-    return {"name": "snow", "emoji_active": "☃️", "emoji_inactive": "⛸️"}
+    return precipitation_kind(mean(wet_bulbs)) if wet_bulbs else "rain"
+
+
+def precipitation_type(
+    temperatures: dict[time, float], dew_points: dict[time, float], chances: dict[time, float]
+) -> Precipitation:
+    precipitation_by_kind = {
+        "rain": {"name": "rain", "emoji_active": "🌧️", "emoji_inactive": "🌂"},
+        "sleet": {"name": "sleet", "emoji_active": "🌨️", "emoji_inactive": "🌂"},
+        "snow": {"name": "snow", "emoji_active": "☃️", "emoji_inactive": "🐻‍❄️"},
+    }
+    wet_bulbs = {
+        hour: wet_bulb_temperature(float(temperatures[hour]), float(dew_points[hour]))
+        for hour in temperatures if hour in dew_points
+    }
+    wet_hour_kinds = [
+        precipitation_kind(wet_bulb) for hour, wet_bulb in wet_bulbs.items()
+        if chances.get(hour, 0) >= constants.min_precipitation_probability
+    ]
+    if wet_hour_kinds:
+        return precipitation_by_kind[Counter(wet_hour_kinds).most_common(1)[0][0]]
+    if wet_bulbs:
+        return precipitation_by_kind[precipitation_kind(mean(wet_bulbs.values()))]
+    return {"name": "precipitation", "emoji_active": "🌧️", "emoji_inactive": "🌂"}
 
 
 def group_by_time(data):

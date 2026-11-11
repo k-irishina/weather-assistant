@@ -70,7 +70,7 @@ def get_sun_times(area: area.Area, date: date) -> Optional[tuple[datetime, datet
 def get_metalerts(county: int) -> Optional[list[dict]]:
     """MET's current land warnings in English. None if MET can't be reached."""
     base_url = "https://api.met.no/weatherapi/metalerts/2.0/current.json"
-    query_params = {'county': f'{county:02d}', 'geographicDomain': 'land', 'lang': 'en'}
+    query_params = {'county': str(county), 'geographicDomain': 'land', 'lang': 'en'}
     data = valid_met_json(met_get(base_url, query_params), "features")
     return None if data is None else data["features"]
 

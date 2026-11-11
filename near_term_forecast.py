@@ -146,12 +146,12 @@ def local_hhmm(moment: datetime, timezone: ZoneInfo) -> str:
     return moment.astimezone(timezone).strftime("%H:%M")
 
 
-def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
+def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo, kind: str = "rain") -> str:
     periods = rain_periods(series.steps, constants.rain_starting_rate)
     if not periods:
         return ""
     period = periods[0]
-    names = {"light": "Light rain", "moderate": "Rain", "heavy": "Heavy rain"}
+    names = {"light": f"Light {kind}", "moderate": kind.capitalize(), "heavy": f"Heavy {kind}"}
     name = names.get(level_of(peak_rate(period)), "Drizzle")
     raining_now = period[0] is series.steps[0]
     lasts_whole_window = period[-1] is series.steps[-1]
@@ -163,29 +163,29 @@ def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo) -> str:
     return f"{name} from about {local_hhmm(period[0].time, timezone)}"
 
 
-def page_payload(series: Optional[NearTermSeries], area_obj: area.Area) -> dict:
-    # the rain strip
+def page_payload(series: Optional[NearTermSeries], area_obj: area.Area, kind: str = "rain") -> dict:
+    # the precipitation strip
     if series is None or not series.steps or not is_covered(area_obj):
         return {"available": False}
 
     timezone = area_obj.region.timezone
-    # the graph shows anything the radar sees, drizzle included
     if not any(step.rate >= constants.drizzle_rate for step in series.steps):
         return {"available": False}
 
     return {
         "available": True,
         "area": area_obj.display_name,
+        "kind": kind,
         "updated_at": local_hhmm(series.created_at, timezone),
         "raining_now": series.steps[0].rate >= constants.rain_starting_rate,
         "peak_rate": peak_rate(series.steps),
         "scale_floor": constants.heavy_rain_rate,
         "total_mm": total_precipitation(series.steps),
         "legend": [
-            {"level": "drizzle", "text": f"Drizzle, from {constants.drizzle_rate:g} mm/h"},
-            {"level": "light", "text": f"Light rain, from {constants.rain_starting_rate:g} mm/h"},
-            {"level": "moderate", "text": f"Rain, from {constants.moderate_rain_rate:g} mm/h"},
-            {"level": "heavy", "text": f"Heavy rain, from {constants.heavy_rain_rate:g} mm/h"},
+            {"level": "drizzle", "text": f"{'Drizzle' if kind == 'rain' else f'Very light {kind}'}, from {constants.drizzle_rate:g} mm/h"},
+            {"level": "light", "text": f"Light {kind}, from {constants.rain_starting_rate:g} mm/h"},
+            {"level": "moderate", "text": f"{kind.capitalize()}, from {constants.moderate_rain_rate:g} mm/h"},
+            {"level": "heavy", "text": f"Heavy {kind}, from {constants.heavy_rain_rate:g} mm/h"},
         ],
         "steps": [
             {

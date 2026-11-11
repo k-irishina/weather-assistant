@@ -18,6 +18,8 @@ medium_cloud_weight = 0.3
 
 # hourly precipitation probability %
 min_precipitation_probability = 20.0
+max_snow_wet_bulb = 0.5
+max_sleet_wet_bulb = 1.5
 high_possibility_precipitation = 50.0
 confident_hour_probability = 35.0
 possible_hour_probability = min_precipitation_probability / 2

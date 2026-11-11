@@ -12,7 +12,6 @@ import area
 import assistant
 import db_connector as db
 import met_alerts
-import nve_warnings
 
 log = logging.getLogger(__name__)
 
@@ -108,32 +107,21 @@ async def push_morning_forecast(at: time) -> None:
         subscriptions = db.morning_subscriptions_for_area(area_obj, at, weekend)
         if not subscriptions:
             continue
-        admins = [s for s in subscriptions if s.is_admin]
-        others = [s for s in subscriptions if not s.is_admin]
         try:
             report = assistant.forecast_for_area(area_obj)
-            texts = [(others, assistant.format_forecast_text_short(report))]
-            if admins:
-                today = area_obj.region.today()
-                all_alerts = met_alerts.alerts_for(area_obj, today) + nve_warnings.warnings_for(area_obj, today)
-                # only orange and red warnings and no landslides for push
-                alerts = [
-                    alert for alert in all_alerts
-                    if alert.color in ("orange", "red") and alert.kind != "landslide"
-                ]
-                texts.append((admins, assistant.format_forecast_text_short(report, alerts)))
+            # MET warnings only for now as NVE doesn't have good short descriptions
+            alerts = met_alerts.alerts_for(area_obj, area_obj.region.today())
+            text = assistant.format_forecast_text_short(report, alerts)
         except Exception:
             log.exception("Could not build forecast for %s", area_obj.display_name)
             continue
-        for recipients, text in texts:
-            if recipients:
-                await asyncio.to_thread(
-                    send_to_subscriptions,
-                    recipients,
-                    f"Forecast for {area_obj.display_name}",
-                    text.strip(),
-                    "morning-forecast",
-                )
+        await asyncio.to_thread(
+            send_to_subscriptions,
+            subscriptions,
+            f"Forecast for {area_obj.display_name}",
+            text.strip(),
+            "morning-forecast",
+        )
         log.info("Morning forecast %s for %s", at.strftime("%H:%M"), area_obj.display_name)
 
 
