@@ -1039,3 +1039,12 @@ body:not(.glitter-mode)[data-sky-colours] :is(h1, .place) {
   [data-sky-colours="sunny"] { --sky-from: #f69356; --sky-to: #ffdc7a; }
   [data-sky-colours="cloudy"] { --sky-from: #a9c1ec; --sky-to: #8877ae; }
 }
+
+.warning-advice {
+  margin: .25rem 0 .5rem;
+  padding-left: 1.2rem;
+}
+
+.warning-advice li {
+  margin-bottom: .3rem;
+}

@@ -419,35 +419,32 @@ def _alert_duration_text(alert: met_alerts.Alert, local_now: datetime) -> str:
     tomorrow = today + timedelta(days=1)
     starts = alert.starts.astimezone(local_now.tzinfo)
     ends = alert.ends.astimezone(local_now.tzinfo)
+    start_day = "today" if starts.date() == today else ("tomorrow" if starts.date() == tomorrow else f"{starts:%A}")
+    end_day = "today" if ends.date() == today else ("tomorrow" if ends.date() == tomorrow else f"{ends:%A}")
 
-    if ends.date() == today:
-        until = f"until {ends:%H:%M}"
-    elif ends.date() == tomorrow:
-        until = "until tomorrow"
-    else:
-        until = f"until {ends:%A}"
-
-    if starts <= local_now:
-        start = ""
-    elif starts.date() == today:
-        start = f"from {starts:%H:%M} "
-    elif starts.date() == tomorrow:
-        start = f"from tomorrow {starts:%H:%M} "
-    else:
-        start = f"from {starts:%A %H:%M} "
-    text = start + until
+    if starts <= local_now and ends.date() == today:
+        text = f"until {ends:%H:%M}"
+    if starts <= local_now and ends.date() != today:
+        text = f"until {end_day} {ends:%H:%M}"
+    if starts > local_now and starts.date() == ends.date():
+        text = f"{start_day} {starts:%H:%M}–{ends:%H:%M}"
+    if starts > local_now and starts.date() != ends.date():
+        text = f"from {start_day} {starts:%H:%M} until {end_day} {ends:%H:%M}"
     return text[0].upper() + text[1:]
 
 
-def _readable_instruction(text: str) -> str:
+def _readable_instruction(text: str) -> list[dict]:
     skipped = ("municipalities", "stay informed", "keep yourself updated")
-    paragraphs = []
+    items = []
     for paragraph in text.split("\n\n"):
-        sentences = re.split(r"(?<=[.!?])\s+", paragraph.strip())
-        kept = [sentence for sentence in sentences if not any(words in sentence.lower() for words in skipped)]
-        if kept:
-            paragraphs.append(" ".join(kept))
-    return "\n\n".join(paragraphs)
+        parts = re.split(r"(?:^|(?<=[.!?]\s))([A-Z][^.:!?]{1,60}):\s", paragraph.strip())
+        pieces = [(None, parts[0])] + list(zip(parts[1::2], parts[2::2]))
+        for title, body in pieces:
+            sentences = re.split(r"(?<=[.!?])\s+", body.strip())
+            kept = [sentence for sentence in sentences if sentence and not any(words in sentence.lower() for words in skipped)]
+            if kept:
+                items.append({"title": title, "text": " ".join(kept)})
+    return items
 
 
 @router.get("/warnings")

@@ -112,12 +112,28 @@ async function loadWarnings() {
       const time = document.createElement('p');
       time.className = 'muted';
       time.textContent = when;
-      const paragraphs = instruction.split('\n\n').map((text) => {
-        const paragraph = document.createElement('p');
-        paragraph.textContent = text;
-        return paragraph;
-      });
-      warning.append(summary, time, ...paragraphs);
+      const advice = [];
+      let list = null;
+      for (const { title: heading, text } of instruction) {
+        if (heading) {
+          if (!list) {
+            list = document.createElement('ul');
+            list.className = 'warning-advice';
+            advice.push(list);
+          }
+          const item = document.createElement('li');
+          const bold = document.createElement('strong');
+          bold.textContent = `${heading}: `;
+          item.append(bold, text);
+          list.append(item);
+        } else {
+          list = null;
+          const paragraph = document.createElement('p');
+          paragraph.textContent = text;
+          advice.push(paragraph);
+        }
+      }
+      warning.append(summary, time, ...advice);
       return warning;
     }));
     els.warnings.hidden = warnings.length === 0;
@@ -449,7 +465,7 @@ async function loadNearTermForecast() {
       els.rain.hidden = true;
       return;
     }
-    els.rainTitle.textContent = `Two-hour ${data.kind}`;
+    els.rainTitle.textContent = `Two-hour ${data.kind || 'precipitation'}`;
     renderRainStrip(data);
     els.rain.hidden = false;
   } catch (err) {

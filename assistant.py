@@ -895,7 +895,7 @@ def precipitation_kind_next_hours(area_obj: area.Area) -> str:
         wet_bulb_temperature(float(temperatures[hour]), float(dew_points[hour]))
         for hour in hours if hour in temperatures and hour in dew_points
     ]
-    return precipitation_kind(mean(wet_bulbs)) if wet_bulbs else "rain"
+    return precipitation_kind(mean(wet_bulbs)) if wet_bulbs else "precipitation"
 
 
 def precipitation_type(
