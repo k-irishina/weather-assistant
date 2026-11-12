@@ -4,7 +4,7 @@ from datetime import datetime, time
 from typing import NamedTuple, Optional
 
 DAY_PARTS = ("morning", "day", "sunset", "evening", "night")
-CONDITION_WORDS = ("sunny", "clear", "cloudy", "fog", "rain", "heavyrain", "snow", "heavysnow")
+CONDITION_WORDS = ("sunny", "clear", "cloudy", "fog", "rain", "heavyrain", "sleet", "snow", "heavysnow")
 PHOTO_EXTENSIONS = ("jpg", "jpeg", "png", "webp")
 
 class Photo(NamedTuple):
@@ -24,9 +24,8 @@ def photo_conditions(base: str) -> list[tuple]:
         return [("cloudy", "")]
     if base == "fog":
         return [("fog",)]
-    # sleet counts as snow for now
     if "sleet" in base:
-        return [("snow",)]
+        return [("sleet",), ("snow",)]
     if "snow" in base:
         return [("heavysnow",), ("snow",)] if base.startswith("heavy") else [("snow",)]
     if base == "rain" or base.startswith("lightrain"):
