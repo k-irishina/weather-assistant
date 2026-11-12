@@ -359,6 +359,7 @@ a {
 footer {
   margin-top: 2rem;
   font-size: .85rem;
+  line-height: 1.35;
   text-align: center;
 }
 
@@ -1063,4 +1064,52 @@ body:not(.glitter-mode)[data-sky-colours] :is(h1, .place) {
 
 .warning-advice li {
   margin-bottom: .3rem;
+}
+
+body:not(.photo-mode) #photo-description {
+  display: none;
+}
+
+body.photo-mode #photo-description:not([hidden]) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: .8rem;
+}
+
+.photo-caption {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: .9rem;
+  color: #fff;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease;
+}
+
+body.photo-peek .photo-caption {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: light) {
+  body.photo-mode[data-photo-accent] {
+    --sky-from: var(--photo-from);
+    --sky-to: var(--photo-to);
+    --accent: var(--photo-from);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body.photo-mode[data-photo-accent-dark] {
+    --sky-from: var(--photo-dark-from);
+    --sky-to: var(--photo-dark-to);
+    --accent: var(--photo-dark-from);
+  }
 }

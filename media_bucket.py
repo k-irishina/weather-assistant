@@ -16,6 +16,7 @@ REGION = "auto"
 LINK_SECONDS = 2 * 24 * 60 * 60
 
 _listed: dict[date, dict[str, str]] = {}  # UTC day -> file name -> link
+_details: dict[date, dict] = {}  # UTC day -> photo name -> description and colours
 
 
 def configured() -> bool:
@@ -69,3 +70,23 @@ def background_links() -> dict[str, str]:
         cache = {"response-cache-control": "max-age=86400"}
         _listed[today] = {name: presigned_url(name, today, cache) for name in names}
     return _listed[today]
+
+
+def photo_details() -> dict[str, dict]:
+    today = datetime.now(timezone.utc).date()
+    if today in _details:
+        return _details[today]
+    details = {}
+    link = background_links().get("photos.json")
+    if link:
+        try:
+            response = requests.get(link, timeout=10)
+            details = response.json() if response.status_code == 200 else {}
+        except (requests.RequestException, ValueError) as error:
+            log.error("Couldnt read photos.json: %s", error)
+        if not isinstance(details, dict):
+            log.error("malformed photos.json: %r", details)
+            details = {}
+    _details.clear()
+    _details[today] = details
+    return details

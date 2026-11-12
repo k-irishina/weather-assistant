@@ -1,11 +1,16 @@
 import calendar
+import logging
 import random
+import re
 from datetime import datetime, time
 from typing import NamedTuple, Optional
 
 DAY_PARTS = ("morning", "day", "sunset", "evening", "night")
 CONDITION_WORDS = ("sunny", "clear", "cloudy", "fog", "rain", "heavyrain", "sleet", "snow", "heavysnow")
 PHOTO_EXTENSIONS = ("jpg", "jpeg", "png", "webp")
+
+log = logging.getLogger(__name__)
+
 
 class Photo(NamedTuple):
     name: str
@@ -105,3 +110,28 @@ def pick_photo(
                 if doesfit:
                     return random.choice(doesfit)
     return None
+
+
+
+def relative_luminance(hex_colour: str) -> float:
+    channels = [int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def readable_colours(colours, background: str, photo_name: str) -> Optional[list[str]]:
+    if colours is None:
+        return None
+    valid = isinstance(colours, list) and len(colours) == 2 and all(
+        isinstance(colour, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", colour) for colour in colours)
+    if not valid:
+        log.warning("Accent for %s should be two colours like [\"#3b5a8c\", \"#8a4f9e\"]: %r", photo_name, colours)
+        return None
+    for colour in colours:
+        lighter, darker = sorted((relative_luminance(colour), relative_luminance(background)), reverse=True)
+        contrast = (lighter + 0.05) / (darker + 0.05)
+        if contrast < 4.5:
+            log.warning("Accent %s for %s is hard to read on %s with contrast %.1f - need 4.5",
+                        colour, photo_name, background, contrast)
+            return None
+    return colours

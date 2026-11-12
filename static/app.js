@@ -386,6 +386,27 @@ let photoName = null;
 let photoPickedAt = 0;
 
 let photoVideo = null;
+
+function showPhotoDetails({ description, credit, accent, accent_dark: accentDark }) {
+  const body = document.body;
+  body.toggleAttribute('data-photo-accent', Boolean(accent));
+  body.toggleAttribute('data-photo-accent-dark', Boolean(accentDark));
+  if (accent) {
+    body.style.setProperty('--photo-from', accent[0]);
+    body.style.setProperty('--photo-to', accent[1]);
+  }
+  if (accentDark) {
+    body.style.setProperty('--photo-dark-from', accentDark[0]);
+    body.style.setProperty('--photo-dark-to', accentDark[1]);
+  }
+  const caption = [description, credit && `Photo: ${credit}`].filter(Boolean).join(' · ');
+  const captionLine = document.getElementById('photo-caption');
+  captionLine.textContent = caption;
+  captionLine.hidden = !caption;
+  const footerLine = document.getElementById('photo-description');
+  footerLine.textContent = description ? `Photo: ${description}` : '';
+  footerLine.hidden = !description;
+}
 const backgroundVideo = document.createElement('video');
 backgroundVideo.className = 'background-video';
 backgroundVideo.muted = true;
@@ -421,11 +442,13 @@ async function showPhoto(comingBack = false) {
     if (areaId !== null) params.set('area', areaId);
     if (photoName) params.set('current', photoName);
     const res = await fetch(`/api/background?${params}`);
-    const { area, name, link, video } = await res.json();
+    const details = await res.json();
+    const { area, name, link, video } = details;
     photoArea = area;
     if (name === photoName && link) return;
     photoName = name;
     photoVideo = video;
+    showPhotoDetails(details);
     if (!link) {
       document.body.style.setProperty('--photo', 'none');
       showVideo(null);

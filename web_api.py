@@ -253,7 +253,8 @@ def get_near_term_forecast(area: Optional[int] = None) -> dict:
 def get_background(area: Optional[int] = None, current: Optional[str] = None) -> dict:
     chosen = resolve_area(area)
     if not media_bucket.configured():
-        return {"area": chosen.id, "name": None, "link": None, "video": None}
+        return {"area": chosen.id, "name": None, "link": None, "video": None,
+                "description": None, "credit": None, "accent": None, "accent_dark": None}
     local_now = chosen.region.now()
     symbol = db.hourly_symbols(chosen, local_now.date()).get(time(local_now.hour), "")
     sun_times = rcf.fetch_sunset_sunrise_for_area(chosen)
@@ -262,7 +263,20 @@ def get_background(area: Optional[int] = None, current: Optional[str] = None) ->
         links, symbol, local_now, sun_times["sunrise_time"], sun_times["sunset_time"], current
     )
     video_name = name.rpartition(".")[0] + ".mp4" if name else None
-    return {"area": chosen.id, "name": name, "link": links.get(name), "video": links.get(video_name)}
+    details = media_bucket.photo_details().get(name, {}) if name else {}
+    if not isinstance(details, dict):
+        log.warning("photos.json entry for %s should be an object like {\"description\": ...}: %r", name, details)
+        details = {}
+    return {
+        "area": chosen.id,
+        "name": name,
+        "link": links.get(name),
+        "video": links.get(video_name),
+        "description": details.get("description"),
+        "credit": details.get("credit"),
+        "accent": background_photo_picker.readable_colours(details.get("accent"), "#f4f6f8", name),
+        "accent_dark": background_photo_picker.readable_colours(details.get("accent_dark"), "#141b26", name),
+    }
 
 
 @router.get("/areas")
