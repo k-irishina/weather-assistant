@@ -253,7 +253,7 @@ def get_near_term_forecast(area: Optional[int] = None) -> dict:
 def get_background(area: Optional[int] = None, current: Optional[str] = None) -> dict:
     chosen = resolve_area(area)
     if not media_bucket.configured():
-        return {"area": chosen.id, "name": None, "link": None}
+        return {"area": chosen.id, "name": None, "link": None, "video": None}
     local_now = chosen.region.now()
     symbol = db.hourly_symbols(chosen, local_now.date()).get(time(local_now.hour), "")
     sun_times = rcf.fetch_sunset_sunrise_for_area(chosen)
@@ -261,7 +261,8 @@ def get_background(area: Optional[int] = None, current: Optional[str] = None) ->
     name = background_photo_picker.pick_photo(
         links, symbol, local_now, sun_times["sunrise_time"], sun_times["sunset_time"], current
     )
-    return {"area": chosen.id, "name": name, "link": links.get(name)}
+    video_name = name.rpartition(".")[0] + ".mp4" if name else None
+    return {"area": chosen.id, "name": name, "link": links.get(name), "video": links.get(video_name)}
 
 
 @router.get("/areas")

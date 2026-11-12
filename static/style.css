@@ -122,6 +122,22 @@ body.photo-mode::before {
   opacity: 1;
 }
 
+.background-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .6s ease;
+}
+
+body.photo-mode .background-video.playing {
+  opacity: 1;
+}
+
 body.photo-mode .card,
 body.photo-mode header,
 body.photo-mode footer {

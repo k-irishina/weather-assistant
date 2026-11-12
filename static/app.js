@@ -385,6 +385,29 @@ let photoArea;
 let photoName = null;
 let photoPickedAt = 0;
 
+let photoVideo = null;
+const backgroundVideo = document.createElement('video');
+backgroundVideo.className = 'background-video';
+backgroundVideo.muted = true;
+backgroundVideo.loop = true;
+backgroundVideo.playsInline = true;
+backgroundVideo.preload = 'none';
+backgroundVideo.setAttribute('aria-hidden', 'true');
+backgroundVideo.addEventListener('playing', () => backgroundVideo.classList.add('playing'));
+document.body.prepend(backgroundVideo);
+
+// no videos for lowdata mode, reduced motion, low power
+function showVideo(link) {
+  backgroundVideo.classList.remove('playing');
+  backgroundVideo.removeAttribute('src');
+  backgroundVideo.load();
+  const saveData = Boolean(navigator.connection && navigator.connection.saveData);
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!link || saveData || reducedMotion) return;
+  backgroundVideo.src = link;
+  backgroundVideo.play().catch(() => {});
+}
+
 async function showPhoto(comingBack = false) {
   if (!document.body.classList.contains('photo-mode')) return;
   const areaId = selectedArea ?? rememberedArea();
@@ -398,18 +421,21 @@ async function showPhoto(comingBack = false) {
     if (areaId !== null) params.set('area', areaId);
     if (photoName) params.set('current', photoName);
     const res = await fetch(`/api/background?${params}`);
-    const { area, name, link } = await res.json();
+    const { area, name, link, video } = await res.json();
     photoArea = area;
     if (name === photoName && link) return;
     photoName = name;
+    photoVideo = video;
     if (!link) {
       document.body.style.setProperty('--photo', 'none');
+      showVideo(null);
       return;
     }
     // shown once downloaded
     const image = new Image();
     image.onload = image.onerror = () => {
       document.body.style.setProperty('--photo', `url("${link}")`);
+      showVideo(video);
     };
     image.src = link;
   } catch (err) {
@@ -927,6 +953,7 @@ const themeOptions = els.themeMenu.querySelectorAll('[data-theme-option]');
 function setTheme(theme) {
   document.body.classList.toggle('glitter-mode', theme === 'glitter');
   document.body.classList.toggle('photo-mode', theme === 'photo');
+  showVideo(theme === 'photo' ? photoVideo : null);
   showPhoto();
   for (const option of themeOptions) {
     const selected = option.dataset.themeOption === theme;
