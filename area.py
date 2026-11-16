@@ -37,6 +37,10 @@ OSLO = Region(name="Oslo", region_id=101, ssb_county=3, timezone=ZoneInfo("Europ
 RIGA = Region(name="Riga", region_id=102, ssb_county=0, timezone=ZoneInfo("Europe/Riga"))
 ROGALAND = Region(name="Rogaland", region_id=103, ssb_county=11, timezone=ZoneInfo("Europe/Oslo"))
 AKERSHUS = Region(name="Akershus", region_id=104, ssb_county=32, timezone=ZoneInfo("Europe/Oslo"))
+BUSKERUD = Region(name="Buskerud", region_id=105, ssb_county=33, timezone=ZoneInfo("Europe/Oslo"))
+AGDER = Region(name="Agder", region_id=106, ssb_county=42, timezone=ZoneInfo("Europe/Oslo"))
+TRONDELAG = Region(name="Trøndelag", region_id=107, ssb_county=50, timezone=ZoneInfo("Europe/Oslo"))
+INNLANDET = Region(name="Innlandet", region_id=108, ssb_county=34, timezone=ZoneInfo("Europe/Oslo"))
 
 # SSB municipality numbers
 OSLO_KOMMUNE = "0301"
@@ -44,6 +48,13 @@ LILLESTROM = "3205"
 BAERUM = "3201"
 STAVANGER = "1103"
 SANDNES = "1108"
+DRAMMEN = "3301"
+KRISTIANSAND = "4204"
+TRONDHEIM = "5001"
+EIDSVOLL = "3240"
+LORENSKOG = "3222"
+NORDRE_FOLLO = "3207"
+HAMAR = "3403"
 
 areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO, OSLO_KOMMUNE), 
           2: Area(59.9549, 11.0622, 2, 'Lillestrøm', AKERSHUS, LILLESTROM),
@@ -62,6 +73,14 @@ areas =  {1: Area(59.9325, 10.7613, 1, 'Oslo - Torshov', OSLO, OSLO_KOMMUNE),
           15: Area(59.842, 10.812, 15, 'Oslo - Søndre Nordstrand', OSLO, OSLO_KOMMUNE),
           16: Area(59.963, 10.668, 16, 'Oslo - Holmenkollen', OSLO, OSLO_KOMMUNE),
           17: Area(58.8517, 5.7369, 17, 'Sandnes', ROGALAND, SANDNES),
-          18: Area(58.948, 5.645, 18, 'Madla', ROGALAND, STAVANGER)
+          18: Area(58.948, 5.645, 18, 'Madla', ROGALAND, STAVANGER),
+          19: Area(59.744, 10.2045, 19, 'Drammen', BUSKERUD, DRAMMEN),
+          20: Area(58.1467, 7.9956, 20, 'Kristiansand', AGDER, KRISTIANSAND),
+          21: Area(63.4305, 10.3951, 21, 'Trondheim', TRONDELAG, TRONDHEIM),
+          22: Area(60.3305, 11.2615, 22, 'Eidsvoll', AKERSHUS, EIDSVOLL),
+          23: Area(60.2755, 11.1795, 23, 'Råholt', AKERSHUS, EIDSVOLL),
+          24: Area(59.927, 10.961, 24, 'Lørenskog', AKERSHUS, LORENSKOG),
+          25: Area(59.7195, 10.8355, 25, 'Ski', AKERSHUS, NORDRE_FOLLO),
+          26: Area(60.7945, 11.068, 26, 'Hamar', INNLANDET, HAMAR)
         }
 
