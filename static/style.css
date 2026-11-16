@@ -1009,6 +1009,9 @@ div.period-tile .period-tile-value {
 }
 
 .period-tile-caption {
+  flex: 1 1 4rem;
+  min-width: 0;
+  margin-left: .2rem;
   font-size: .8rem;
   line-height: 1.3;
 }

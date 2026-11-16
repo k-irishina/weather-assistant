@@ -146,23 +146,6 @@ def local_hhmm(moment: datetime, timezone: ZoneInfo) -> str:
     return moment.astimezone(timezone).strftime("%H:%M")
 
 
-def compose_near_rain_text(series: NearTermSeries, timezone: ZoneInfo, kind: str = "rain") -> str:
-    periods = rain_periods(series.steps, constants.rain_starting_rate)
-    if not periods:
-        return ""
-    period = periods[0]
-    names = {"light": f"Light {kind}", "moderate": kind.capitalize(), "heavy": f"Heavy {kind}"}
-    name = names.get(level_of(peak_rate(period)), "Drizzle")
-    raining_now = period[0] is series.steps[0]
-    lasts_whole_window = period[-1] is series.steps[-1]
-    if raining_now and lasts_whole_window:
-        return f"{name} for the next 2 hours"
-    if raining_now and not lasts_whole_window:
-        ends = period[-1].time + timedelta(minutes=STEP_MINUTES)
-        return f"{name} until about {local_hhmm(ends, timezone)}"
-    return f"{name} from about {local_hhmm(period[0].time, timezone)}"
-
-
 def page_payload(series: Optional[NearTermSeries], area_obj: area.Area, kind: str = "rain") -> dict:
     # the precipitation strip
     if series is None or not series.steps or not is_covered(area_obj):

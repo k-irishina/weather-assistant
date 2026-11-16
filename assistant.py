@@ -33,7 +33,6 @@ class WeatherCondition:
 class CurrentConditions(TypedDict):
     temperature: Optional[int]
     feels_like: Optional[int]
-    rain: str
     symbol_code: Optional[str]
 
 
@@ -276,7 +275,7 @@ def forecast_for_area(area_obj: area.Area, day: str = "today") -> ForecastReport
 
 
 def right_now_reading(area_obj: area.Area, hour: time, hourly_temperatures: dict, wind_by_hour: dict) -> CurrentConditions:
-    right_now = CurrentConditions(temperature=None, feels_like=None, rain="", symbol_code=None)
+    right_now = CurrentConditions(temperature=None, feels_like=None, symbol_code=None)
     temperature = hourly_temperatures.get(hour)
     if temperature is not None:
         temperature = float(temperature)
@@ -289,16 +288,6 @@ def right_now_reading(area_obj: area.Area, hour: time, hourly_temperatures: dict
             feels_like = 13.12 + 0.6215 * temperature - 11.37 * wind_factor + 0.3965 * temperature * wind_factor
             if abs(round_temperature(feels_like) - round_temperature(temperature)) >= 2:
                 right_now["feels_like"] = round_temperature(feels_like)
-
-    if near_term_forecast.is_covered(area_obj):
-        now = datetime.now(timezone.utc)
-        series = near_term_forecast.latest_series(area_obj)
-        if series is not None and near_term_forecast.is_fresh(series, now):
-            series = near_term_forecast.without_past_steps(series, now)
-            rain_text = near_term_forecast.compose_near_rain_text(
-                series, area_obj.region.timezone, precipitation_kind_next_hours(area_obj))
-            if rain_text:
-                right_now["rain"] = rain_text[0].lower() + rain_text[1:]
     return right_now
 
 

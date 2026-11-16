@@ -178,10 +178,8 @@ function periodTiles(now, temperatures) {
   hoursPanel.hidden = true;
 
   if (now && now.temperature !== null) {
-    const captions = [];
-    if (now.feels_like !== null) captions.push(`Feels like ${now.feels_like}°`);
-    if (now.rain) captions.push(now.rain[0].toUpperCase() + now.rain.slice(1));
-    tiles.append(periodTile('Now', now.icon, `${now.temperature}°`, captions.join('. ')));
+    const caption = now.feels_like === null ? '' : `feels like ${now.feels_like}°`;
+    tiles.append(periodTile('Now', now.icon, `${now.temperature}°`, caption));
   }
 
   for (const period of Object.values(temperatures || {})) {
@@ -225,14 +223,15 @@ function periodTile(label, icon, value, caption) {
     reading.append(img);
   }
   reading.append(value);
-  tile.append(reading);
 
+  // beside the temperature, so the tile doesn't grow taller than the others
   if (caption) {
     const note = document.createElement('span');
     note.className = 'period-tile-caption';
     note.textContent = caption;
-    tile.append(note);
+    reading.append(note);
   }
+  tile.append(reading);
   return tile;
 }
 
@@ -447,7 +446,7 @@ function showVideo(link) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!link || saveData || reducedMotion) return;
   backgroundVideo.src = link;
-  backgroundVideo.play().catch(() => {});
+  backgroundVideo.play().catch(() => { });
 }
 
 async function showPhoto(comingBack = false) {
