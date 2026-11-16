@@ -12,6 +12,7 @@ import area
 import db_connector
 import near_term_forecast
 import retrieve_complete_forecast as rcf
+from json_processor import parse_utc
 from background_photo_picker import day_part
 
 
@@ -105,6 +106,32 @@ def period_symbol(symbols: dict[time, str], hours, tie_hour: int, daylight: int)
         return base + "_day"
     dark = [suffix for suffix in suffixes if suffix != "_day"]
     return base + (Counter(dark).most_common(1)[0][0] if dark else "_night")
+
+
+def week_preview(area_obj: area.Area) -> list[dict]:
+    steps_by_day = {}
+    for entry in rcf.latest_full_forecast.get(area_obj.id, []):
+        utc_time = parse_utc(entry["forecast_time"])
+        if utc_time.hour % 6 == 0 and entry.get("next_6_hours"):
+            local_day = utc_time.astimezone(area_obj.region.timezone).date()
+            steps_by_day.setdefault(local_day, []).append(entry)
+
+    week = []
+    for days_ahead in range(1, 8):
+        day = area_obj.region.today() + timedelta(days=days_ahead)
+        steps = steps_by_day.get(day, [])
+        if len(steps) < 4:
+            break
+        bases = [split_symbol(step["next_6_hours"]["symbol_code"])[0] for step in steps]
+        counts = Counter(bases)
+        tied = [base for base in counts if counts[base] == max(counts.values())]
+        midday_base = bases[2]
+        week.append({
+            "day": day,
+            "avg_temperature": mean(step["air_temperature"] for step in steps),
+            "symbol_code": midday_base if midday_base in tied else tied[0],
+        })
+    return week
 
 
 def sky_colours_for_title(local_now: datetime, sunrise: time, sunset: time, symbol_code: Optional[str]) -> str:
@@ -468,7 +495,8 @@ def compact_precipitation_text(report: ForecastReport) -> str:
         window_hours = bridge_gaps(report["precipitation_window_hours"], constants.max_bridge_gap_hours)
         return (f'{precipitation["emoji_active"]} might {precipitation["name"]} '
                 f'{format_hours(window_hours)}')
-    return f'{precipitation["emoji_inactive"]} no {precipitation["name"]}'
+    dry_name = "rain" if precipitation["name"] == "sleet" else precipitation["name"]
+    return f'{precipitation["emoji_inactive"]} no {dry_name}'
 
 
 def morning_forecast(user_id):
@@ -698,7 +726,8 @@ def precipitation_conditions(
         return items
 
     if window_probability is None:
-        return [WeatherCondition(kind="rain", emoji=inactive, text=f"No {name} in sight!")]
+        dry_name = "rain" if name == "sleet" else name
+        return [WeatherCondition(kind="rain", emoji=inactive, text=f"No {dry_name} in sight!")]
 
     window_hours = bridge_gaps(window_hours, constants.max_bridge_gap_hours)
     span = f" {format_hours(window_hours, from_hour)}" if window_hours else ""

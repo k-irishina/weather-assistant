@@ -239,14 +239,23 @@ function periodTile(label, icon, value, caption) {
 function hourStrip(hours) {
   const strip = document.createElement('ol');
   strip.className = 'temp-hours';
-  for (const { label, temperature } of hours) {
+  for (const { label, temperature, icon } of hours) {
     const item = document.createElement('li');
     const time = document.createElement('span');
     time.className = 'temp-hour';
     time.textContent = label;
     const value = document.createElement('span');
     value.textContent = temperature === null ? '–' : `${temperature}°`;
-    item.append(time, value);
+    item.append(time);
+    if (icon) {
+      const img = document.createElement('img');
+      img.src = icon;
+      img.alt = '';
+      img.width = 28;
+      img.height = 28;
+      item.append(img);
+    }
+    item.append(value);
     strip.append(item);
   }
   return strip;
@@ -361,6 +370,8 @@ async function loadForecast(day = 'today') {
       headingRow.append(dayFlipButton('‹ Today', 'today'));
     }
 
+    const weekWasOpen = Boolean(els.forecast.querySelector('.week-preview[open]'));
+
     els.forecast.classList.remove('page-flip');
     void els.forecast.offsetWidth;
     els.forecast.replaceChildren(
@@ -368,6 +379,16 @@ async function loadForecast(day = 'today') {
       periodTiles(data.now, data.temperatures),
       conditionList(data.conditions),
     );
+
+    if (data.week && data.week.length) {
+      const weekPreview = document.createElement('details');
+      weekPreview.className = 'period-hours week-preview';
+      weekPreview.open = weekWasOpen;
+      const summary = document.createElement('summary');
+      summary.textContent = `Next ${data.week.length} days`;
+      weekPreview.append(summary, hourStrip(data.week));
+      els.forecast.append(weekPreview);
+    }
     els.forecast.classList.add('page-flip');
     if (day === 'today') showPhoto();
     loadWarnings();

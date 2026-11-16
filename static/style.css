@@ -1021,6 +1021,22 @@ div.period-tile .period-tile-value {
   gap: .4rem;
 }
 
+.week-preview {
+  margin: .5rem 0 0;
+}
+
+.week-preview summary {
+  cursor: pointer;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.week-preview .temp-hours {
+  grid-template-columns: repeat(7, 1fr);
+  margin-top: .5rem;
+}
+
 .period-hours .temp-hours li {
   padding: .35rem 0;
   border-radius: .5rem;

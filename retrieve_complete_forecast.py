@@ -14,6 +14,7 @@ import yr_requests
 log = logging.getLogger(__name__)
 
 _failed_at: dict[int, datetime] = {}
+latest_full_forecast: dict[int, list] = {}
 
 def hourly_entries(entries: list, user_area: area.Area) -> list:
     day_after_tomorrow = user_area.region.today() + timedelta(days=2)
@@ -72,6 +73,7 @@ def fetch_forecast_for_area_id(area_id):
     forecast_created_at = json_processor.created_at_utc(data)
 
     db_data = json_processor.create_data_json(data)
+    latest_full_forecast[user_area.id] = db_data
 
     # audit
     last_modified_text = response.headers.get('Last-Modified')

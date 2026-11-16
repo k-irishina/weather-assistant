@@ -237,7 +237,21 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
 def get_forecast(area: Optional[int] = None, day: str = "today") -> dict:
     if day not in ("today", "tomorrow"):
         raise HTTPException(status_code=400, detail="day must be 'today' or 'tomorrow'.")
-    return forecast_payload(assistant.forecast_for_area(resolve_area(area), day=day))
+    chosen = resolve_area(area)
+    payload = forecast_payload(assistant.forecast_for_area(chosen, day=day))
+    payload["week"] = [
+        {
+            "label": preview["day"].strftime("%a"),
+            "temperature": _temperature(preview["avg_temperature"]),
+            "icon": _symbol_icon(
+                preview["symbol_code"]
+                if (WEATHER_ICON_DIR / f"{preview['symbol_code']}.png").is_file()
+                else preview["symbol_code"] + "_day"
+            ),
+        }
+        for preview in assistant.week_preview(chosen)
+    ]
+    return payload
 
 
 @router.get("/near-term-forecast")
