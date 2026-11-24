@@ -245,12 +245,6 @@ function hourStrip(hours) {
     time.textContent = label;
     const value = document.createElement('span');
     value.textContent = temperature === null ? '–' : `${temperature}°`;
-    if (low !== undefined && low !== null) {
-      const night = document.createElement('span');
-      night.className = 'temp-low';
-      night.textContent = `/${low}°`;
-      value.append(document.createElement('wbr'), night);
-    }
     item.append(time);
     if (icon) {
       const img = document.createElement('img');
@@ -261,6 +255,12 @@ function hourStrip(hours) {
       item.append(img);
     }
     item.append(value);
+    if (low !== undefined && low !== null) {
+      const night = document.createElement('span');
+      night.className = 'temp-low';
+      night.textContent = `${low}°`;
+      item.append(night);
+    }
     strip.append(item);
   }
   return strip;
