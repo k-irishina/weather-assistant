@@ -358,7 +358,7 @@ a {
 
 footer {
   margin-top: 2rem;
-  font-size: .85rem;
+  font-size: .9rem;
   line-height: 1.35;
   text-align: center;
 }
@@ -375,7 +375,7 @@ select {
 
 #area-note {
   margin: .6rem 0 0;
-  font-size: .85rem;
+  font-size: .9rem;
 }
 
 #area-note:empty {
@@ -439,7 +439,7 @@ select {
 
 .rain-info {
   margin-bottom: .6rem;
-  font-size: .85rem;
+  font-size: .9rem;
 }
 
 .rain-info p {
@@ -470,7 +470,7 @@ select {
   gap: 2px;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: .8rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -504,7 +504,7 @@ select {
   flex: none;
   width: auto;
   padding: .3rem .6rem;
-  font-size: .85rem;
+  font-size: .9rem;
   font-weight: 600;
   color: var(--accent);
   background: none;
@@ -628,7 +628,7 @@ select {
   border-radius: 999px;
   background: var(--sun);
   color: #4a3500;
-  font-size: .75rem;
+  font-size: .8rem;
   font-weight: 700;
   vertical-align: middle;
 }
@@ -708,7 +708,7 @@ body.glitter-mode .new-badge {
 
 #in-app-note {
   margin: .6rem 0 0;
-  font-size: .85rem;
+  font-size: .9rem;
   overflow-wrap: anywhere;
 }
 
@@ -743,7 +743,7 @@ body.glitter-mode .new-badge {
   gap: .4rem;
   line-height: 1.5rem;
   color: var(--muted);
-  font-size: .85rem;
+  font-size: .9rem;
   font-weight: 600;
 }
 
@@ -828,7 +828,7 @@ body.glitter-mode .new-badge {
 }
 
 .temp-hour {
-  font-size: .75rem;
+  font-size: .8rem;
   color: var(--muted);
 }
 
@@ -855,7 +855,7 @@ body.glitter-mode .right-now {
 
 .updated-note {
   margin-left: .4rem;
-  font-size: .85rem;
+  font-size: .9rem;
   font-weight: normal;
   white-space: nowrap;
 }
@@ -995,7 +995,7 @@ button.period-tile[aria-expanded="true"] {
 }
 
 .period-tile-label {
-  font-size: .85rem;
+  font-size: .9rem;
 }
 
 .period-tile-value {
@@ -1038,13 +1038,13 @@ div.period-tile .period-tile-value {
 
 .week-preview summary {
   cursor: pointer;
-  font-size: .85rem;
+  font-size: .9rem;
   font-weight: 600;
   color: var(--accent);
 }
 
 .temp-low {
-  font-size: .8em;
+  font-size: .8rem;
   color: var(--muted);
 }
 
@@ -1062,6 +1062,13 @@ div.period-tile .period-tile-value {
 body:not(.glitter-mode)[data-sky-colours] {
   --accent: var(--sky-from);
   --line: color-mix(in srgb, var(--accent) 16%, var(--card));
+  --muted: color-mix(in srgb, var(--accent) 30%, #5c6b80);
+}
+
+@media (prefers-color-scheme: dark) {
+  body:not(.glitter-mode)[data-sky-colours] {
+    --muted: color-mix(in srgb, var(--accent) 30%, #94a3b8);
+  }
 }
 
 body:not(.glitter-mode)[data-sky-colours] :is(h1, .place) {
