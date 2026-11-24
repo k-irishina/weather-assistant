@@ -32,14 +32,16 @@ def fetch_forecast_for_area_id(area_id):
         return
 
     last_fetch = db.forecast_update_log(user_area)
-    
-    if last_fetch and last_fetch.expire_time:
+    # deploys clear memory - fetch regardless if it's cleared
+    have_full_forecast = user_area.id in latest_full_forecast
+
+    if last_fetch and last_fetch.expire_time and have_full_forecast:
         if last_fetch.expire_time > datetime.now(timezone.utc):
             log.info("Existing forecast still valid, skip calling API")
             return
 
     last_modified = None
-    if last_fetch and last_fetch.last_modified:
+    if last_fetch and last_fetch.last_modified and have_full_forecast:
         last_modified = last_fetch.last_modified.astimezone(timezone.utc).strftime(
             "%a, %d %b %Y %H:%M:%S GMT"
         )
