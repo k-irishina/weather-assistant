@@ -187,7 +187,7 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     )
     for condition in conditions:
         for line in condition.details:
-            if "symbol" in line:
+            if condition.kind != "wind":
                 line["icon"] = _symbol_icon(line["symbol"])
 
     return {

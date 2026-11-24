@@ -1044,6 +1044,30 @@ div.period-tile .period-tile-value {
   margin-top: .5rem;
 }
 
+.wind-hours {
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+}
+
+.wind-hours li {
+  padding: .35rem 0;
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.wind-hours li[data-strength="moderate"] {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.wind-hours li[data-strength="strong"] {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.wind-direction {
+  display: inline-block;
+  margin-right: .25rem;
+  vertical-align: -1px;
+}
+
 .period-hours .temp-hours li {
   padding: .35rem 0;
   border-radius: .5rem;

@@ -521,7 +521,7 @@ def from_hour_onwards(by_hour: dict, cutoff: Optional[time]) -> dict:
     return {hour: value for hour, value in by_hour.items() if hour >= cutoff}
 
 
-def wind_arrow(hours, wind_by_hour: dict) -> str:
+def wind_from_degrees(hours, wind_by_hour: dict) -> Optional[float]:
     east, north, total_speed = 0.0, 0.0, 0.0
     for hour in hours:
         reading = wind_by_hour.get(hour)
@@ -533,10 +533,15 @@ def wind_arrow(hours, wind_by_hour: dict) -> str:
         north += speed * math.cos(angle)
         total_speed += speed
 
-    # if too variable, show nothing
     if total_speed == 0 or math.hypot(east, north) < total_speed / 2:
+        return None
+    return math.degrees(math.atan2(east, north)) % 360
+
+
+def wind_arrow(hours, wind_by_hour: dict) -> str:
+    from_degrees = wind_from_degrees(hours, wind_by_hour)
+    if from_degrees is None:
         return ""
-    from_degrees = math.degrees(math.atan2(east, north)) % 360
     return ("↓", "↙", "←", "↖", "↑", "↗", "→", "↘")[round(from_degrees / 45) % 8]
 
 
@@ -604,8 +609,14 @@ def wind_conditions(
             gusts = [float(wind_by_hour[hour].gust) for hour in hours if wind_by_hour[hour].gust is not None]
             if not speeds:
                 continue
-            numbers = f"{round(sum(speeds) / len(speeds))}({round(max(gusts))})" if gusts else f"{round(sum(speeds) / len(speeds))}"
-            items[-1].details.append({"hours": f"{format_hours(hours, current_hour)} {arrow} {numbers}"})
+            from_degrees = wind_from_degrees(hours, wind_by_hour)
+            items[-1].details.append({
+                "hours": f"{hours[0].hour}" if len(hours) == 1 else f"{hours[0].hour}–{hours[-1].hour}",
+                "degrees": None if from_degrees is None else round(from_degrees),
+                "speed": round(sum(speeds) / len(speeds)),
+                "gust": round(max(gusts)) if gusts else None,
+                "strength": strength,
+            })
     return items
 
 

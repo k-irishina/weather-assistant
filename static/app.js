@@ -267,6 +267,30 @@ function hourStrip(hours) {
   return strip;
 }
 
+function windStrip(groups) {
+  const strip = document.createElement('ol');
+  strip.className = 'temp-hours wind-hours';
+  for (const { hours, degrees, speed, gust, strength } of groups) {
+    const item = document.createElement('li');
+    item.dataset.strength = strength;
+    const time = document.createElement('span');
+    time.className = 'temp-hour';
+    time.textContent = hours;
+    const value = document.createElement('span');
+    if (degrees !== null) {
+      const arrow = document.createElement('span');
+      arrow.className = 'wind-direction';
+      arrow.style.transform = `rotate(${degrees}deg)`;
+      arrow.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 1v9M2.5 6.5 6 10l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      value.append(arrow);
+    }
+    value.append(gust === null ? `${speed}` : `${speed}(${gust})`);
+    item.append(time, value);
+    strip.append(item);
+  }
+  return strip;
+}
+
 function conditionList(items) {
   const list = document.createElement('ul');
   list.className = 'conditions';
@@ -299,22 +323,23 @@ function conditionList(items) {
       toggle.className = 'details-toggle';
       toggle.textContent = 'Detailed';
       summary.append(mark, text, toggle);
-      const lines = document.createElement('ul');
-      for (const line of item.details) {
-        const lineItem = document.createElement('li');
-        if (line.icon) {
+      if (item.kind === 'wind') {
+        details.append(summary, windStrip(item.details));
+      } else {
+        const lines = document.createElement('ul');
+        for (const line of item.details) {
+          const lineItem = document.createElement('li');
           const icon = document.createElement('img');
           icon.src = line.icon;
           icon.alt = line.label;
           icon.title = line.label;
           icon.width = 28;
           icon.height = 28;
-          lineItem.append(icon);
+          lineItem.append(icon, line.hours);
+          lines.append(lineItem);
         }
-        lineItem.append(line.hours);
-        lines.append(lineItem);
+        details.append(summary, lines);
       }
-      details.append(summary, lines);
       row.append(details);
     } else {
       row.append(mark, text);
