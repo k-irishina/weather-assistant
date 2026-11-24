@@ -913,6 +913,14 @@ body.glitter-mode #about-toggle.has-news::after {
   border-left: 4px solid var(--sun);
 }
 
+.warnings[data-level="orange"] {
+  border-left-color: #f07d00;
+}
+
+.warnings[data-level="red"] {
+  border-left-color: #d6202a;
+}
+
 .warning summary {
   font-size: .9rem;
 }
@@ -1053,6 +1061,7 @@ div.period-tile .period-tile-value {
 
 body:not(.glitter-mode)[data-sky-colours] {
   --accent: var(--sky-from);
+  --line: color-mix(in srgb, var(--accent) 16%, var(--card));
 }
 
 body:not(.glitter-mode)[data-sky-colours] :is(h1, .place) {

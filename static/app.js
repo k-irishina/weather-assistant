@@ -136,6 +136,7 @@ async function loadWarnings() {
       warning.append(summary, time, ...advice);
       return warning;
     }));
+    els.warnings.dataset.level = ['red', 'orange', 'yellow'].find((level) => warnings.some(({ color }) => color === level)) || '';
     els.warnings.hidden = warnings.length === 0;
   } catch (err) {
     els.warnings.hidden = true;
