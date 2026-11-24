@@ -301,13 +301,16 @@ function conditionList(items) {
       const lines = document.createElement('ul');
       for (const line of item.details) {
         const lineItem = document.createElement('li');
-        const icon = document.createElement('img');
-        icon.src = line.icon;
-        icon.alt = line.label;
-        icon.title = line.label;
-        icon.width = 28;
-        icon.height = 28;
-        lineItem.append(icon, line.hours);
+        if (line.icon) {
+          const icon = document.createElement('img');
+          icon.src = line.icon;
+          icon.alt = line.label;
+          icon.title = line.label;
+          icon.width = 28;
+          icon.height = 28;
+          lineItem.append(icon);
+        }
+        lineItem.append(line.hours);
         lines.append(lineItem);
       }
       details.append(summary, lines);
@@ -500,6 +503,21 @@ function dayFlipButton(label, targetDay) {
   button.onclick = () => loadForecast(targetDay);
   return button;
 }
+
+let swipeStart = null;
+els.forecast.addEventListener('touchstart', (event) => {
+  swipeStart = event.touches.length === 1 ? event.touches[0] : null;
+}, { passive: true });
+els.forecast.addEventListener('touchend', (event) => {
+  if (!swipeStart) return;
+  const end = event.changedTouches[0];
+  const sideways = end.clientX - swipeStart.clientX;
+  const upDown = end.clientY - swipeStart.clientY;
+  swipeStart = null;
+  if (Math.abs(sideways) < 60 || Math.abs(sideways) < 2 * Math.abs(upDown)) return;
+  if (sideways < 0 && forecastDay === 'today') loadForecast('tomorrow');
+  if (sideways > 0 && forecastDay === 'tomorrow') loadForecast('today');
+});
 
 const POLLING_REGION_TIME_ZONE = 'Europe/Oslo';
 const ACTIVE_POLL_MS = 10 * 60 * 1000;

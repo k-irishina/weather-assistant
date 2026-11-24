@@ -187,7 +187,8 @@ def forecast_payload(report: assistant.ForecastReport) -> dict:
     )
     for condition in conditions:
         for line in condition.details:
-            line["icon"] = _symbol_icon(line["symbol"])
+            if "symbol" in line:
+                line["icon"] = _symbol_icon(line["symbol"])
 
     return {
         "area": area.areas[report["area_id"]].group_and_short_name()[1],

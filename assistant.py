@@ -587,6 +587,25 @@ def wind_conditions(
     if shown_moderate and has_long_enough_run and enough_hrs_total:
         items.append(WeatherCondition(kind="wind", emoji="\U0001f4a8",
                                text=f"Moderate wind {wind_hours_with_arrows(shown_moderate, moderate_set, wind_by_hour, current_hour)}."))
+
+    if items:
+        groups = []
+        for hour, reading in sorted(wind_by_hour.items()):
+            if current_hour is not None and hour < current_hour:
+                continue
+            strength = constants.wind_strength(reading.speed, reading.gust, reading.percentile_90)
+            key = (wind_arrow([hour], wind_by_hour), strength)
+            if groups and groups[-1][0] == key:
+                groups[-1][1].append(hour)
+            else:
+                groups.append((key, [hour]))
+        for (arrow, strength), hours in groups:
+            speeds = [float(wind_by_hour[hour].speed) for hour in hours if wind_by_hour[hour].speed is not None]
+            gusts = [float(wind_by_hour[hour].gust) for hour in hours if wind_by_hour[hour].gust is not None]
+            if not speeds:
+                continue
+            numbers = f"{round(sum(speeds) / len(speeds))}({round(max(gusts))})" if gusts else f"{round(sum(speeds) / len(speeds))}"
+            items[-1].details.append({"hours": f"{format_hours(hours, current_hour)} {arrow} {numbers}"})
     return items
 
 
