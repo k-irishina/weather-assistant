@@ -31,6 +31,8 @@ def restructure_next_x_hours(block):
                       'precipitation_amount_min': details.get('precipitation_amount_min'),
                       'precipitation_amount_max': details.get('precipitation_amount_max'),
                       }
+        if 'air_temperature_min' in details:
+            next_hours['air_temperature_min'] = details['air_temperature_min']
         return next_hours
 
 

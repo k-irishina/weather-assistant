@@ -243,6 +243,7 @@ def get_forecast(area: Optional[int] = None, day: str = "today") -> dict:
         {
             "label": preview["day"].strftime("%a"),
             "temperature": _temperature(preview["avg_temperature"]),
+            "low": _temperature(preview["night_low"]),
             "icon": _symbol_icon(
                 preview["symbol_code"]
                 if (WEATHER_ICON_DIR / f"{preview['symbol_code']}.png").is_file()

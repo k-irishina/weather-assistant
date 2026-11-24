@@ -129,6 +129,7 @@ def week_preview(area_obj: area.Area) -> list[dict]:
             "day": day,
             "avg_temperature": mean(step["air_temperature"] for step in steps),
             "symbol_code": midday_base if midday_base in tied else tied[0],
+            "night_low": steps[0]["next_6_hours"].get("air_temperature_min"),
         })
     return week
 

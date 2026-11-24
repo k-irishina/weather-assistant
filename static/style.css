@@ -1035,6 +1035,11 @@ div.period-tile .period-tile-value {
   color: var(--accent);
 }
 
+.temp-low {
+  font-size: .8em;
+  color: var(--muted);
+}
+
 .week-preview .temp-hours {
   grid-template-columns: repeat(7, 1fr);
   margin-top: .5rem;

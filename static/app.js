@@ -238,13 +238,19 @@ function periodTile(label, icon, value, caption) {
 function hourStrip(hours) {
   const strip = document.createElement('ol');
   strip.className = 'temp-hours';
-  for (const { label, temperature, icon } of hours) {
+  for (const { label, temperature, icon, low } of hours) {
     const item = document.createElement('li');
     const time = document.createElement('span');
     time.className = 'temp-hour';
     time.textContent = label;
     const value = document.createElement('span');
     value.textContent = temperature === null ? '–' : `${temperature}°`;
+    if (low !== undefined && low !== null) {
+      const night = document.createElement('span');
+      night.className = 'temp-low';
+      night.textContent = `/${low}°`;
+      value.append(document.createElement('wbr'), night);
+    }
     item.append(time);
     if (icon) {
       const img = document.createElement('img');
